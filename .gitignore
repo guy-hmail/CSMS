@@ -1,0 +1,26 @@
+node_modules
+.svelte-kit
+build
+.vercel
+.env
+.env.*
+!.env.example
+!.env.production.example
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Supabase CLI local state
+supabase/.branches/
+supabase/.temp/
+supabase/functions/.env
+
+# LIFF local HTTPS certificates
+localhost.pem
+localhost-key.pem
+
+# Local logs and generated archives
+.dev-server.log
+.dev-server-error.log
+supabase.zip
