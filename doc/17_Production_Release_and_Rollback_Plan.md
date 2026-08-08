@@ -20,7 +20,18 @@ Feature candidate commit: `d385a4b`
 - ✅ Last-known-good Vercel production deployment: `dpl_Fy2cLUrzWk1JvwPiUqvNRB4tqY2m` / `https://csms-h9nmg102t-hpstat.vercel.app`, status Ready, alias `csms-rouge.vercel.app`
 - ✅ Product owner approved production deployment on 8 August 2026 after backup and dry-run review
 
-**Decision: APPROVED — DATABASE MIGRATION NEXT.** รัน 6 migrations ด้วย secure database password จากนั้นตรวจ remote history/smoke test ก่อน push `main` หรือ deploy Vercel
+**Decision: RELEASE SUCCESS.** Database migrations, source push, Vercel production deployment และ unauthenticated smoke checks สำเร็จแล้ว ต้องติดตาม authenticated business-flow smoke test และ logs ต่อใน observation window
+
+Release result — 8 August 2026:
+
+- Database: migrations `20260802010000` และ `20260808010000`–`20260808050000` applied; Local/Remote history ตรงกัน
+- Git: `main` pushed through commit `297ec64`
+- Vercel: deployment `dpl_5qe33Qg2mZaFh2BjaTYkjyTdzm5g`, URL `https://csms-hancxr4ee-hpstat.vercel.app`, status Ready
+- Production alias: `https://csms-rouge.vercel.app`
+- Rollback target: `dpl_Fy2cLUrzWk1JvwPiUqvNRB4tqY2m`
+- Public smoke: `/`, `/app`, `/app/help` returned HTTP 200
+- Immediate Vercel production 5xx query: no logs found
+- Remaining observation: LINE LIFF login and authenticated tenant/report/dashboard/OU flows require user-session smoke verification
 
 Manual backup checksums:
 

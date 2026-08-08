@@ -10,8 +10,8 @@ This repository is deployed with a Vercel frontend and a hosted Supabase backend
 - Frontend platform: Vercel
 - Backend platform: Hosted Supabase
 - Production URL: `https://csms-rouge.vercel.app/`
-- Release identifier: not recorded in the repository
-- Post-deployment smoke-test evidence: not yet recorded in the repository
+- Release identifier: Git `297ec64`, Vercel `dpl_5qe33Qg2mZaFh2BjaTYkjyTdzm5g`
+- Post-deployment smoke-test: passed 8 August 2026; `/`, `/app`, and `/app/help` returned HTTP 200 and no production 5xx logs were present immediately after deployment
 
 For every subsequent release, follow `doc/17_Production_Release_and_Rollback_Plan.md`. The release must have a verified backup/PITR checkpoint and a recorded last-known-good Vercel deployment before production migration begins.
 

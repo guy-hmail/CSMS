@@ -142,8 +142,8 @@ Future:
 Deployment record:
 
 -   [x] Production release promoted and Go-Live confirmed on 8 August 2026
--   [ ] Record the production URL and release identifier in the repository
--   [ ] Attach post-deployment smoke-test evidence
+-   [x] Production URL and release identifier recorded for release `297ec64` / `dpl_5qe33Qg2mZaFh2BjaTYkjyTdzm5g`
+-   [x] Post-deployment smoke evidence recorded: `/`, `/app`, `/app/help` HTTP 200; no immediate production 5xx logs
 -   [ ] Record monitoring and alert ownership
 -   [ ] Record the latest successful backup/restore drill
 
