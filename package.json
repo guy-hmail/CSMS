@@ -7,12 +7,13 @@
     "node": "22.x"
   },
   "scripts": {
-    "dev": "vite dev",
+    "dev": "vite dev --host 127.0.0.1",
     "liff:serve": "node --env-file=.env scripts/start-liff-proxy.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "test:auth": "tsx scripts/invite-token.test.ts",
+    "test:liff-config": "tsx scripts/liff-config.test.ts",
     "test:integration": "tsx scripts/frontend-backend.integration.ts",
     "test:full-loop": "tsx scripts/full-loop.integration.ts",
     "test:edge": "deno test --allow-env supabase/functions/_shared/shared_test.ts",

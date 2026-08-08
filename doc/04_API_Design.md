@@ -639,6 +639,18 @@ Returns `name`, `slug`, `timezone`, `reportingWeekEndsOn`, `approvalMode`, and `
 
 Requires an active direct Root OU admin. Validate the primary metric belongs to the tenant, week-end range is 0–6, timezone is supported, and approval-mode rules from `set_tenant_approval_mode`. Slug changes use a separate platform-controlled operation. Write one tenant-wide audit event with old/new values.
 
+### LINE OA and Rich Menu configuration (read-only)
+
+There is no tenant LIFF mutation API. LIFF applications are owned by the platform and selected through deployment environment variables:
+
+- `PUBLIC_LINE_LIFF_ID`: LIFF ID used by the running environment and by generated invitation links.
+- `PUBLIC_LINE_LIFF_PRODUCTION_ID`: canonical production LIFF ID displayed in Tenant Settings.
+- `PUBLIC_PRODUCTION_APP_URL`: canonical production web URL displayed in Tenant Settings.
+
+Tenant Settings exposes the production LIFF URL and web URL as read-only values with copy/open actions. Tenant administrators use one of these URLs as the Link/URI action in their LINE OA Rich Menu; they cannot change the platform LIFF ID.
+
+`LINE_CHANNEL_ID`, channel secret, Messaging API credentials for the central CSMS OA, Supabase keys, and other credentials remain managed through Supabase Edge Function secrets or deployment environments. Tenant OAs act as entry points. When notification delivery is enabled, outbound LINE messages must use the central CSMS OA; the delivery Edge Function is a separate rollout item from this read-only Tenant Settings change.
+
 ---
 
 # 12. Organization APIs
@@ -756,7 +768,6 @@ Critical: Yes
 {
   "parentOuId": "uuid",
   "ouTypeId": "uuid",
-  "code": "GROUP-A",
   "name": "Group A",
   "description": "Cell group A",
   "allowDataEntry": true,
@@ -780,8 +791,10 @@ Allowed permissions on parent OU subtree:
 5. Copy the type's `default_allow_data_entry` only when `allowDataEntry` is omitted; an explicit OU value overrides it.
 6. Calculate `level = parent.level + 1`.
 7. Generate `path` after insert using parent path + new OU id.
-8. Enforce unique `(church_id, code)`.
-9. Write audit log.
+8. Generate an immutable ASCII code from the OU Type code and the new OU UUID, for example `GROUP-A1B2C3D4E5F6`. Localized names, including Thai, do not affect the code.
+9. Enforce unique `(church_id, code)`.
+10. When the new OU accepts data and the parent currently accepts data, automatically set the parent `allow_data_entry = false` to keep direct submission at the leaf edge and prevent double counting.
+11. Audit both the child creation and any automatic parent change.
 
 ### Response
 
@@ -789,10 +802,18 @@ Allowed permissions on parent OU subtree:
 {
   "success": true,
   "data": {
-    "ouId": "uuid"
+    "ouId": "uuid",
+    "ouCode": "GROUP-A1B2C3D4E5F6",
+    "parentOuId": "uuid",
+    "parentOuName": "Main Church",
+    "parentDataEntryDisabled": true
   }
 }
 ```
+
+`parentDataEntryDisabled` lets the frontend notify the user that the parent was changed automatically.
+
+`ouCode` is internal response metadata. Application screens must not render it; user-facing OU selection and labels use the OU name. Export and system integration may continue using the code where a stable business identifier is required.
 
 ---
 
@@ -1201,6 +1222,46 @@ Phase: 1 Tenant Admin Feature
 - Metric `code` and `dataType` are immutable after values exist; use a new metric when semantics change.
 - Deactivate used metrics instead of deleting them.
 - Validate the complete resulting configuration and write an audit log with old and new values.
+
+---
+
+## 15.4 Calculated Metric APIs
+
+`create_calculated_metric` and `update_calculated_metric` manage tenant-defined, report-only fields. They use the same direct Root OU Admin permission contract as input metric settings.
+
+```json
+{
+  "code": "TOTAL_CHURCH_ATTENDANCE",
+  "name": "คนมาคจ.",
+  "description": "ผู้ใหญ่ + เด็ก + ผจ. + ผส.",
+  "category": "attendance",
+  "unit": "คน",
+  "sortOrder": 15,
+  "sourceMetricIds": ["uuid-1", "uuid-2", "uuid-3", "uuid-4"]
+}
+```
+
+Rules:
+
+- v1 supports `SUM` with at least two active numeric input metrics whose aggregation is `sum`.
+- Every source must belong to the authenticated current tenant; calculated-to-calculated dependencies are rejected.
+- Calculated fields are excluded from weekly submission context and cannot receive `statistic_values`.
+- Active source metrics cannot be deactivated or changed to an incompatible aggregation while referenced by an active calculation.
+- `get_report_table` and `get_report_trend` calculate values from approved submissions and return `metricKind`, `calculationOperator`, and `sourceMetricCodes` metadata.
+- CSV and Excel exports include active calculated fields through the same dynamic report metric list.
+- Every create/update operation writes an audit log.
+
+### `update_dashboard_metric_settings`
+
+```json
+{
+  "metricIds": ["calculated-metric-uuid", "raw-metric-uuid"]
+}
+```
+
+Requires an active direct Root OU Admin. The ordered array may contain active numeric Raw or Calculated metrics owned by the current tenant. At least one metric is required. The RPC clears the previous selection, assigns `show_on_dashboard = true` to the selected metrics, persists their array order in `dashboard_order`, and writes one tenant-wide audit event.
+
+Dashboard summary cards, trend selection, and child OU comparison return only the configured metrics in this order. Calculated values are evaluated from approved source values and are never persisted in `statistic_values`.
 
 ---
 
@@ -2025,9 +2086,11 @@ Phase: 2 (audit writing remains mandatory for critical mutations from Phase 1)
 
 # 21. Notification APIs
 
+Implementation plan and release gates: `doc/15_Notifications_Phase_Plan.md`.
+
 ## 21.1 `send-line-notification`
 
-Sends LINE notification to users.
+Claims pending notification deliveries and sends them through the central CSMS LINE OA. This function is an internal worker endpoint; browser clients and Tenant settings cannot provide credentials or arbitrary recipients.
 
 Type: Supabase Edge Function  
 Phase: 3
@@ -2043,20 +2106,22 @@ Phase: 3
 
 ```json
 {
-  "userIds": ["uuid"],
-  "templateCode": "PENDING_APPROVAL",
-  "payload": {
-    "ouName": "Group A",
-    "periodLabel": "Week 27 / 2026"
-  }
+  "limit": 50
 }
 ```
+
+The worker claims eligible `pending` delivery rows. Recipient IDs, template/event payload and deep links come from server-created notification records, never from an arbitrary browser request.
 
 ### Rules
 
 - Service role can be used only inside Edge Function.
 - Notification event must be logged.
 - Do not expose LINE secret to frontend.
+- Create the In-app notification and durable delivery record before contacting LINE.
+- Use deterministic event keys to prevent duplicate delivery.
+- Respect active membership and user notification preferences resolved by the backend.
+- Retry only retryable provider failures; retain permanent failures as delivery history/dead letter.
+- A LINE delivery failure must not delete the In-app notification.
 
 ---
 
@@ -2073,7 +2138,8 @@ Phase: 3
 
 - Identify active OUs where `allow_data_entry = true`.
 - Check if submission exists for target period.
-- Create reminder notification records or send LINE notifications.
+- Create idempotent reminder notification/delivery records; the delivery worker sends LINE separately.
+- Skip closed periods, submitted OUs, inactive OUs and inactive recipients.
 
 ---
 

@@ -8,6 +8,7 @@ export type RecursiveSummaryMetric = {
   category: string;
   unit: string;
   aggregation: string;
+  metricKind: 'input' | 'calculated';
   currentValue: number | null;
   compareValue: number | null;
   growthPercent: number | null;
@@ -33,13 +34,14 @@ export type ChildOuSummaryResult = {
     status: 'approved' | 'missing' | 'submitted' | 'draft' | 'returned' | 'rejected' | 'mixed';
     expectedCount: number;
     approvedCount: number;
-    metrics: Array<{ metricCode: string; metricName: string; unit: string; value: number | null }>;
+    metrics: Array<{ metricCode: string; metricName: string; metricKind: 'input' | 'calculated'; unit: string; value: number | null }>;
   }>;
 };
 
 export type DashboardTrend = {
   metricCode: string;
   metricName: string;
+  metricKind: 'input' | 'calculated';
   unit: string;
   points: Array<{ periodId: string; label: string; periodStart: string; periodEnd: string; value: number }>;
 };

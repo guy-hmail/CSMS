@@ -60,7 +60,7 @@
       const client = getSupabaseBrowserClient();
       const summary = await getRecursiveSummary(client, selectedOuId, selectedPeriodId, comparePeriodId);
       if (version !== requestVersion) return;
-      kpiSummaries = summary.metrics.map((metric) => ({ metricCode: metric.metricCode, metricName: metric.metricName, value: metric.currentValue ?? 0, unit: metric.unit, growthPercent: metric.growthPercent }));
+      kpiSummaries = summary.metrics.map((metric) => ({ metricCode: metric.metricCode, metricName: metric.metricName, metricKind: metric.metricKind, value: metric.currentValue ?? 0, unit: metric.unit, growthPercent: metric.growthPercent }));
       summaryEmpty = summary.metrics.every((metric) => metric.currentValue === null);
       if (!summary.metrics.some((metric) => metric.metricCode === selectedMetricCode)) selectedMetricCode = summary.metrics[0]?.metricCode ?? '';
       selectedMetricName = summary.metrics.find((metric) => metric.metricCode === selectedMetricCode)?.metricName ?? '';

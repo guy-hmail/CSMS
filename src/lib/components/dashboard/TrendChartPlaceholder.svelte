@@ -26,7 +26,7 @@
       <span class="sr-only">เลือก Metric สำหรับกราฟแนวโน้ม</span>
       <select class="app-input min-h-9 py-1.5 text-sm" value={selectedMetricCode} disabled={loading} on:change={changeMetric} aria-label="เลือก Metric สำหรับกราฟแนวโน้ม">
         {#each metrics as metric}
-          <option value={metric.metricCode}>{metric.metricName}</option>
+          <option value={metric.metricCode}>{metric.metricName}{metric.metricKind === 'calculated' ? ' (Calculated)' : ' (Raw)'}</option>
         {/each}
       </select>
     </label>

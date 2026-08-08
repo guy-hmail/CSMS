@@ -9,6 +9,7 @@ export type DashboardOption = {
 export type KpiSummary = {
   metricCode: string;
   metricName: string;
+  metricKind: 'input' | 'calculated';
   value: number;
   unit: string;
   growthPercent: number | null;
@@ -33,6 +34,7 @@ export type ChildOuSummaryRow = {
   metrics: Array<{
     metricCode: string;
     metricName: string;
+    metricKind: 'input' | 'calculated';
     value: number | null;
     unit: string;
   }>;

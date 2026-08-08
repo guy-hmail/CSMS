@@ -8,6 +8,9 @@ export type ReportMetric = {
   category: string;
   unit: string;
   aggregation: 'sum' | 'avg' | 'max' | 'min';
+  metricKind: 'input' | 'calculated';
+  calculationOperator: 'sum' | null;
+  sourceMetricCodes: string[];
 };
 
 export type ReportTable = {

@@ -27,11 +27,18 @@ Canonical field dictionary shared by Database, API and Frontend.
 
 `is_system_admin` is not a database field. `app_security.is_system_admin()` and frontend `isSystemAdmin` values are derived from `users.global_role = 'system_admin'`.
 
+## Platform LINE configuration
+
+LIFF configuration is deployment-level configuration, not tenant data. `PUBLIC_LINE_LIFF_ID` selects the LIFF application used by the running environment, while `PUBLIC_LINE_LIFF_PRODUCTION_ID` and `PUBLIC_PRODUCTION_APP_URL` provide the read-only production links shown in Tenant Settings for LINE OA Rich Menu setup.
+
+Tenant tables do not store editable LIFF IDs. `LINE_CHANNEL_ID`, channel secrets, messaging credentials, and provider credentials remain server-side Edge Function secrets and are never exposed as tenant-editable fields.
+
 ## organization_units
 
 | Field | Description |
 |---|---|
 | parent_id | Parent OU |
+| code | Immutable system-generated ASCII identifier based on OU Type code plus UUID suffix; retained for internal API, audit, search, and export use but hidden from application screens |
 | path | Materialized hierarchy path |
 | level | Hierarchy depth |
 | allow_data_entry | Allows direct submission |
@@ -60,6 +67,13 @@ Canonical field dictionary shared by Database, API and Frontend.
 | aggregation | sum/avg/max/min/none |
 | default_value | Optional numeric default within min/max |
 | source_template_set_id | Provisioning template provenance only |
+| metric_kind | `input` for submission values or `calculated` for report-only fields |
+| calculation_operator | Calculation operator; v1 supports `sum` |
+| calculation_source_metric_ids | Tenant-owned active numeric input metrics used by the formula |
+| show_on_dashboard | Whether the active numeric Raw/Calculated metric is shown on Dashboard |
+| dashboard_order | Tenant-configured display order for Dashboard cards and selectors |
+
+Calculated metrics never store rows in `statistic_values`. Report RPCs calculate them from approved source values for the requested OU scope and date range.
 
 ## statistic_submissions
 

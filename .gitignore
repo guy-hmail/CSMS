@@ -23,4 +23,6 @@ localhost-key.pem
 # Local logs and generated archives
 .dev-server.log
 .dev-server-error.log
+.dev-server-current.log
+.dev-server-current-error.log
 supabase.zip

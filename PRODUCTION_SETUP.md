@@ -50,12 +50,18 @@ npx vercel link
 npx vercel env add PUBLIC_SUPABASE_URL production
 npx vercel env add PUBLIC_SUPABASE_ANON_KEY production
 npx vercel env add PUBLIC_LINE_LIFF_ID production
+npx vercel env add PUBLIC_LINE_LIFF_PRODUCTION_ID production
+npx vercel env add PUBLIC_PRODUCTION_APP_URL production
 npx vercel env add PUBLIC_APP_ENV production
 npx vercel
 npx vercel --prod
 ```
 
 Use `.env.production.example` as the variable checklist. Deploy a Preview first, then update `ALLOWED_ORIGINS`, Supabase Auth URLs, and the LINE LIFF Endpoint URL to the final production domain before promoting.
+
+LIFF applications are platform-managed and cannot be changed by a tenant. `PUBLIC_LINE_LIFF_ID` selects the LIFF application for the deployed environment. `PUBLIC_LINE_LIFF_PRODUCTION_ID` and `PUBLIC_PRODUCTION_APP_URL` are displayed read-only in **Tenant Settings → ทั่วไป → LINE OA & Rich Menu**, so a tenant administrator can copy the correct production link into their LINE OA Rich Menu. Keep the production and development LIFF applications under the LINE Login channel represented by the Edge Function `LINE_CHANNEL_ID`, because the backend validates ID tokens against that channel.
+
+Tenant LINE OAs are entry points only. Outbound LINE notification delivery must use the central CSMS LINE OA, while Messaging API credentials for that OA remain in Supabase Edge Function secrets and are never stored in tenant settings. Notification preferences already persist, but the Messaging API delivery Edge Function is a separate rollout item and must be deployed and verified before LINE delivery is considered active.
 
 Vercel automatically sets `VERCEL=1`, which enables the Vercel adapter. Local Windows builds use the auto adapter because the Vercel adapter requires symlink privileges; CI validates the Vercel adapter on Linux.
 

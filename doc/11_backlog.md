@@ -29,6 +29,7 @@ Production Status: ✅ Go-Live แล้วเมื่อ 8 สิงหาค�
 | 6 | Reports (`/app/reports`) | ✅ ผ่าน Definition of Done |
 | 7 | User Settings (`/app/settings`) | ✅ ผ่าน Definition of Done |
 | 8 | Super Admin (`/super-admin/tenants`) | ✅ ผ่าน Definition of Done |
+| 9 | Notifications Phase (In-app + CSMS LINE OA กลาง) | ⬜ Planned |
 | Production | Vercel + Hosted Supabase | ✅ Go-Live แล้ว |
 
 การ Go-Live หมายถึง production baseline ถูกนำขึ้นใช้งานแล้ว งาน Task 1 ที่ยังเหลือและรายการ Technical Debt ด้านล่างเป็นงานปรับปรุงหลัง Go-Live ไม่ใช่ตัวบล็อกสถานะ deployment ปัจจุบัน
@@ -46,7 +47,7 @@ Production Status: ✅ Go-Live แล้วเมื่อ 8 สิงหาค�
 | BE-007 | Audit logging | P0 | ✅ Infrastructure เสร็จแล้ว | ทุก mutation |
 | BE-008 | Seed data | P1 | ✅ Seed และ default tenant data มี tests | Task 1, 8 |
 | BE-009 | Approval workflow | P1 | ✅ Queue, detail, approve, reject, return, override, concurrency และ audit พร้อม | Task 4 |
-| BE-010 | Notification service | P2 | ⬜ Future | Task 7 / Future |
+| BE-010 | Notification service | P2 | ⬜ Planned | Task 9 |
 | FE-001 | LINE Login | P0 | ✅ ใช้งานได้ รวม LIFF Invite flow | Task 2, 7 |
 | FE-002 | Dashboard | P0 | ✅ เชื่อมทุก panel และทดสอบ desktop/mobile แล้ว | Task 5 |
 | FE-003 | Organization Management | P0 | ✅ เชื่อม backend และทดสอบ desktop/mobile แล้ว | Task 2 |
@@ -54,7 +55,7 @@ Production Status: ✅ Go-Live แล้วเมื่อ 8 สิงหาค�
 | FE-005 | Reports | P0 | ✅ เชื่อม backend, export และทดสอบ desktop/mobile แล้ว | Task 6 |
 | FE-006 | Approval Queue | P1 | ✅ เชื่อม backend และทดสอบ desktop/mobile แล้ว | Task 4 |
 | FE-007 | Settings | P1 | 🟡 Personal Settings เสร็จแล้ว; Tenant Settings ยังเหลือ Task 1 | Task 1, 7 |
-| FE-008 | Notification Center | P2 | ⬜ Future | Future |
+| FE-008 | Notification Center | P2 | ⬜ Planned | Task 9 |
 | RP-001 | Weekly Report | P0 | ✅ | Task 6 |
 | RP-002 | Monthly Report | P0 | ✅ | Task 6 |
 | RP-003 | Yearly Report | P0 | ✅ | Task 6 |
@@ -443,11 +444,65 @@ Production Status: ✅ Go-Live แล้วเมื่อ 8 สิงหาค�
 
 ---
 
+## Task 9 — Notifications Phase
+
+ช่องทาง: In-app Notification Center + CSMS LINE OA กลาง
+
+สถานะรวม: ⬜ Planned
+
+แผนละเอียด: `doc/15_Notifications_Phase_Plan.md`
+
+### Scope
+
+- [ ] Notification schema, RLS, indexes และ idempotent event key
+- [ ] Transactional enqueue/outbox สำหรับ business events
+- [ ] Notification list, unread count, mark read/all read และ archive APIs
+- [ ] Notification Center และ badge ที่แยก Tenant ถูกต้อง
+- [ ] Auto event: submitted, approved, returned และ edit request
+- [ ] Auto event: OU assignment/invitation
+- [ ] Supabase Edge Function ส่งผ่าน CSMS LINE OA กลาง
+- [ ] Retry, dead-letter และ provider-error classification
+- [ ] Scheduled missing-submission reminder
+- [ ] Pending-approval daily digest
+- [ ] Add Friend CTA/QR และ In-app fallback
+- [ ] Monitoring, runbook, secret rotation และ production canary
+
+### Architecture Decisions
+
+- Tenant OA เป็น entry point/Rich Menu เท่านั้น
+- Messaging API credentials เก็บใน Supabase Edge Function secrets ระดับ Platform
+- In-app notification เป็น source of truth; LINE เป็น delivery channel
+- Business RPC enqueue event แต่ไม่เรียก LINE provider โดยตรง
+- Scheduled reminders ต้อง deduplicate ตาม Tenant, recipient, OU, period และ reminder window
+
+### Acceptance Criteria
+
+- [ ] Event เดียวกันไม่สร้างหรือส่ง notification ซ้ำ
+- [ ] ผู้ใช้เห็นเฉพาะ notification ของตนใน active Tenant
+- [ ] Recipient selection เคารพ role, OU subtree, active membership และ preferences
+- [ ] LINE ส่งไม่สำเร็จแล้ว In-app notification ยังอยู่
+- [ ] Retry มีขอบเขตและ permanent failure เข้า dead letter
+- [ ] Reminder ข้าม OU ที่ส่งแล้ว, period ปิด, user/OU inactive
+- [ ] Secret/token ไม่ปรากฏใน browser, database payload, audit หรือ logs
+- [ ] มี kill switch ปิด outbound LINE โดยไม่ปิด In-app notification
+
+### Definition of Done — Task 9
+
+- [ ] P0 event notifications ทำงานทั้ง In-app และ LINE OA กลาง
+- [ ] Missing-submission scheduled reminder ทำงานและไม่ส่งซ้ำ
+- [ ] Database, Edge Function, integration และ frontend tests ผ่าน
+- [ ] `npm run check`, production build และ database lint ผ่าน
+- [ ] Preview/canary test และ production smoke evidence ถูกบันทึก
+- [ ] Monitoring, quota/provider outage, replay และ secret-rotation runbook พร้อมใช้งาน
+
+---
+
 ## ลำดับงานถัดไปที่แนะนำ
 
-1. กลับมาปิด Task 1 ส่วน Reporting Periods และ Metric delete/deactivate
-2. บันทึกผล production smoke test, monitoring และ backup/restore evidence
-3. จัดรอบ regression test หลังการเปลี่ยนแปลง production ทุกครั้ง
+1. เริ่ม Task 9 Stage A: Notification schema, RLS, enqueue และ read APIs
+2. กลับมาปิด Task 1 ส่วน Reporting Periods และ Metric delete/deactivate
+3. บันทึกผล production smoke test, monitoring และ backup/restore evidence
+4. จัดรอบ regression test หลังการเปลี่ยนแปลง production ทุกครั้ง
 
 ## Definition of Done สำหรับทุก Task
 
@@ -461,7 +516,6 @@ Production Status: ✅ Go-Live แล้วเมื่อ 8 สิงหาค�
 
 ## Future Enhancements
 
-- Notification Center และ Notification Service
 - QR Attendance
 - Member Management นอกเหนือจาก OU permissions
 - Donation Management

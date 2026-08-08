@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { env } from '$env/dynamic/public';
   import {
+    AlertTriangle,
     Building2,
     CalendarDays,
     CheckCircle2,
@@ -22,6 +23,7 @@
     X
   } from '@lucide/svelte';
   import { getSupabaseBrowserClient } from '$lib/supabase/browser';
+  import { buildLiffUrl } from '$lib/auth/liffConfig';
   import {
     assignOuMember,
     createOrganizationUnit,
@@ -131,12 +133,10 @@
 
   let newOuParentId = selectedOuId;
   let newOuName = '';
-  let newOuCode = '';
   let newOuType: OuType = 'group';
   let newOuAllowDataEntry = true;
 
   let editOuName = '';
-  let editOuCode = '';
   let editOuDescription = '';
   let editOuType: OuType = '';
   let editOuParentId = '';
@@ -164,6 +164,8 @@
   $: selectedMembers = assignments.filter((assignment) => assignment.ouId === selectedOuId);
   $: childCount = authorizedOus.filter((ou) => ou.parentId === selectedOuId).length;
   $: visibleOus = getVisibleOus(authorizedOus, expandedIds, treeSearch);
+  $: selectedNewOuParent = ous.find((ou) => ou.id === newOuParentId);
+  $: willDisableParentDataEntry = newOuAllowDataEntry && selectedNewOuParent?.allowDataEntry === true;
   $: availableAccounts = assignableAccounts.filter((account) => account.active && !account.existingRoles.includes(selectedRole) && `${account.displayName} ${account.lineUserId} ${account.email ?? ''}`.toLowerCase().includes(accountSearch.trim().toLowerCase()));
 
   function getAuthorizedOus(allOus: OrganizationUnit[], rootIds: string[]): OrganizationUnit[] {
@@ -210,6 +212,13 @@
     return names.join(' / ');
   }
 
+  function buildInviteUrl(inviteToken: string): string {
+    const url = buildLiffUrl(env.PUBLIC_LINE_LIFF_ID)
+      ?? new URL('/', window.location.origin);
+    url.searchParams.set('invite', inviteToken);
+    return url.toString();
+  }
+
   function hasChildren(ouId: string): boolean {
     return authorizedOus.some((ou) => ou.parentId === ouId);
   }
@@ -246,7 +255,6 @@
     }
     newOuParentId = selectedOuId;
     newOuName = '';
-    newOuCode = '';
     newOuType = ouTypeOptions[0].id;
     newOuAllowDataEntry = ouTypeOptions[0].defaultAllowDataEntry;
     formError = '';
@@ -265,7 +273,6 @@
   function openEditModal(): void {
     if (!selectedOu) return;
     editOuName = selectedOu.name;
-    editOuCode = selectedOu.code;
     editOuDescription = selectedOu.description ?? '';
     editOuType = selectedOu.type;
     editOuParentId = selectedOu.parentId ?? '';
@@ -279,17 +286,12 @@
   async function saveOu(): Promise<void> {
     if (!selectedOu) return;
     const name = editOuName.trim();
-    const code = editOuCode.trim().toUpperCase();
-    if (!name || !code || !editOuType) {
-      formError = 'กรุณากรอกชื่อ รหัส และประเภท OU ให้ครบ';
+    if (!name || !editOuType) {
+      formError = 'กรุณากรอกชื่อและประเภท OU ให้ครบ';
       return;
     }
     if (selectedOu.parentId && !editOuParentId) {
       formError = 'OU ที่ไม่ใช่ Root ต้องมี OU แม่';
-      return;
-    }
-    if (ous.some((ou) => ou.id !== selectedOu.id && ou.code.toLowerCase() === code.toLowerCase())) {
-      formError = 'รหัส OU นี้ถูกใช้งานแล้ว';
       return;
     }
     if (editOuParentId && (editOuParentId === selectedOu.id || isDescendant(editOuParentId, selectedOu.id))) {
@@ -308,7 +310,6 @@
         ouId: selectedOu.id,
         parentOuId: selectedOu.parentId === null ? null : editOuParentId,
         ouTypeId: editOuType,
-        code,
         name,
         description: editOuDescription.trim() || null,
         allowDataEntry: editOuAllowDataEntry,
@@ -366,24 +367,23 @@
 
   async function createOu(): Promise<void> {
     const name = newOuName.trim();
-    const code = newOuCode.trim().toUpperCase();
     const parent = ous.find((ou) => ou.id === newOuParentId);
-    if (!name || !code || !parent) { formError = 'กรุณากรอกชื่อ รหัส และเลือก OU แม่ให้ครบ'; return; }
-    if (ous.some((ou) => ou.code.toLowerCase() === code.toLowerCase())) { formError = 'รหัส OU นี้ถูกใช้งานแล้ว'; return; }
+    if (!name || !parent) { formError = 'กรุณากรอกชื่อและเลือก OU แม่ให้ครบ'; return; }
     ouCreating = true;
     formError = '';
     try {
       const created = await createOrganizationUnit(getSupabaseBrowserClient(), {
         parentOuId: parent.id,
         ouTypeId: newOuType,
-        code,
         name,
         allowDataEntry: newOuAllowDataEntry
       });
       await loadOrganization(created.ouId);
       expandedIds = new Set([...expandedIds, parent.id]);
       createModalOpen = false;
-      showToast(`สร้าง ${name} ภายใต้ ${parent.name} และบันทึกลงฐานข้อมูลแล้ว`);
+      showToast(created.parentDataEntryDisabled
+        ? `สร้าง ${name} แล้ว และปิดการรับข้อมูลของ OU แม่ “${created.parentOuName}” อัตโนมัติ เพื่อป้องกันการนับข้อมูลซ้ำ`
+        : `สร้าง ${name} ภายใต้ ${parent.name} แล้ว`);
     } catch (error) {
       formError = error instanceof Error ? error.message : 'ไม่สามารถสร้าง OU ได้';
     } finally {
@@ -550,11 +550,7 @@
         expiresInDays: inviteExpiresInDays,
         displayName: inviteDisplayName.trim() || undefined
       });
-      const liffId = env.PUBLIC_LINE_LIFF_ID;
-      const baseUrl = liffId
-        ? `https://liff.line.me/${liffId}`
-        : `${window.location.origin}/`;
-      inviteLink = `${baseUrl}?invite=${encodeURIComponent(created.inviteToken)}`;
+      inviteLink = buildInviteUrl(created.inviteToken);
       inviteExpiresAt = created.expiresAt;
       await loadMembers(selectedOu.id);
     } catch (error) {
@@ -573,13 +569,12 @@
   function shareInviteToLineFriend(): void {
     if (!inviteLink || !selectedOu) return;
     formError = '';
-    const liffId = env.PUBLIC_LINE_LIFF_ID;
-    if (!liffId) {
+    const shareUrl = buildLiffUrl(env.PUBLIC_LINE_LIFF_ID, 'line/share-invite');
+    if (!shareUrl) {
       formError = 'ยังไม่ได้ตั้งค่า LINE LIFF ID';
       return;
     }
     const roleLabel = roleOptions.find((role) => role.id === inviteRole)?.label ?? inviteRole;
-    const shareUrl = new URL(`https://liff.line.me/${liffId}/line/share-invite`);
     shareUrl.searchParams.set('invite', inviteLink);
     shareUrl.searchParams.set('ou', selectedOu.name);
     shareUrl.searchParams.set('role', roleLabel);
@@ -650,11 +645,9 @@
         invitationId: invitation.invitationId,
         expiresInDays: reissueInviteExpiresInDays
       });
-      const liffId = env.PUBLIC_LINE_LIFF_ID;
-      const baseUrl = liffId ? `https://liff.line.me/${liffId}` : `${window.location.origin}/`;
       inviteRole = invitation.permission;
       inviteCanOverride = invitation.canOverride;
-      inviteLink = `${baseUrl}?invite=${encodeURIComponent(created.inviteToken)}`;
+      inviteLink = buildInviteUrl(created.inviteToken);
       inviteExpiresAt = created.expiresAt;
       reissueInviteTarget = null;
       inviteModalOpen = true;
@@ -834,7 +827,7 @@
             {:else}<span class="h-8 w-8 shrink-0"></span>{/if}
             <button type="button" class={`app-focus min-w-0 flex-1 rounded-xl border px-3 py-2.5 text-left transition ${selectedOuId === ou.id ? 'border-sky-200 bg-gradient-to-r from-sky-50 to-emerald-50 shadow-sm' : 'border-transparent hover:bg-slate-50'}`} on:click={() => selectOu(ou.id)}>
               <span class="flex items-center justify-between gap-2"><span class={`truncate text-sm font-semibold ${selectedOuId === ou.id ? 'text-sky-900' : 'text-slate-700'}`}>{ou.name}</span>{#if ou.allowDataEntry}<span class="h-2 w-2 shrink-0 rounded-full bg-emerald-500" title="รับข้อมูล"></span>{/if}</span>
-              <span class="mt-0.5 block truncate text-[0.68rem] text-slate-400">{ou.code} · {getOuTypeLabel(ou.type)}</span>
+              <span class="mt-0.5 block truncate text-[0.68rem] text-slate-400">{getOuTypeLabel(ou.type)}</span>
             </button>
           </div>
         {:else}
@@ -850,7 +843,7 @@
           <div class="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div class="flex min-w-0 items-start gap-4">
               <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-sky-200 ring-1 ring-white/15"><Building2 size={24} /></span>
-              <div class="min-w-0"><p class="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">{getOuTypeLabel(selectedOu.type)} · {selectedOu.code}</p><h2 class="mt-1 truncate text-2xl font-semibold">{selectedOu.name}</h2><p class="mt-2 flex items-start gap-1.5 text-xs leading-5 text-slate-300"><MapPin class="mt-0.5 shrink-0" size={14} /><span>{getPath(selectedOu)}</span></p></div>
+              <div class="min-w-0"><p class="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">{getOuTypeLabel(selectedOu.type)}</p><h2 class="mt-1 truncate text-2xl font-semibold">{selectedOu.name}</h2><p class="mt-2 flex items-start gap-1.5 text-xs leading-5 text-slate-300"><MapPin class="mt-0.5 shrink-0" size={14} /><span>{getPath(selectedOu)}</span></p></div>
             </div>
             <div class="flex flex-wrap gap-2"><button type="button" class="app-focus inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/15" on:click={openEditModal}><Pencil size={16} /> แก้ไขข้อมูล</button>{#if selectedOu.parentId !== null}<button type="button" class="app-focus inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-rose-300/30 bg-rose-500/15 px-4 text-sm font-semibold text-rose-100 hover:bg-rose-500/25" on:click={openDeleteOuModal}><Trash2 size={16} /> ปิดใช้งาน</button>{/if}</div>
           </div>
@@ -928,11 +921,13 @@
       <div class="mt-5 grid gap-4 sm:grid-cols-2">
         <label class="sm:col-span-2"><span class="text-sm font-medium text-slate-700">OU แม่</span><select class="app-input mt-2" bind:value={newOuParentId}>{#each authorizedOus as ou}<option value={ou.id}>{'— '.repeat(getDisplayDepth(ou))}{ou.name}</option>{/each}</select></label>
         <label><span class="text-sm font-medium text-slate-700">ชื่อ OU</span><input class="app-input mt-2" bind:value={newOuName} placeholder="เช่น กลุ่ม E" /></label>
-        <label><span class="text-sm font-medium text-slate-700">รหัส OU</span><input class="app-input mt-2 uppercase" bind:value={newOuCode} placeholder="เช่น GP-E" /></label>
         <label><span class="text-sm font-medium text-slate-700">ประเภท</span><select class="app-input mt-2" bind:value={newOuType} disabled={ouCreating} on:change={handleOuTypeChange}>{#each ouTypeOptions as item}<option value={item.id}>{item.label}</option>{/each}</select><span class="mt-1 block text-xs text-slate-500">เลือก Type ที่เปิดใช้งานได้โดยไม่ต้องเรียงตามลำดับ</span></label>
         <label class="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3 sm:self-end"><input class="h-4 w-4 accent-sky-600" type="checkbox" bind:checked={newOuAllowDataEntry} /><span><span class="block text-sm font-medium text-slate-700">รับข้อมูลรายสัปดาห์</span><span class="block text-xs text-slate-400">ข้อมูลตรงของ OU นี้เท่านั้น และจะรวมเพิ่มกับ OU ลูก</span></span></label>
       </div>
-      <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" class="app-button-secondary" disabled={ouCreating} on:click={() => (createModalOpen = false)}>ยกเลิก</button><button type="button" class="app-button-primary" disabled={ouCreating || !newOuName.trim() || !newOuCode.trim() || !newOuType} on:click={createOu}>{ouCreating ? 'กำลังสร้าง...' : 'สร้าง OU'}</button></div>
+      {#if willDisableParentDataEntry}
+        <div class="mt-4 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4" role="alert"><AlertTriangle class="mt-0.5 shrink-0 text-amber-700" size={18} /><div><p class="text-sm font-semibold text-amber-950">OU แม่จะหยุดรับข้อมูลอัตโนมัติ</p><p class="mt-1 text-xs leading-5 text-amber-800">เมื่อสร้าง OU นี้ ระบบจะเปลี่ยน “{selectedNewOuParent?.name}” เป็นสรุปข้อมูลจาก OU ลูก เพื่อป้องกันการนับข้อมูลซ้ำ</p></div></div>
+      {/if}
+      <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" class="app-button-secondary" disabled={ouCreating} on:click={() => (createModalOpen = false)}>ยกเลิก</button><button type="button" class="app-button-primary" disabled={ouCreating || !newOuName.trim() || !newOuType} on:click={createOu}>{ouCreating ? 'กำลังสร้าง...' : 'สร้าง OU'}</button></div>
     </section>
   </div>
 {/if}
@@ -945,7 +940,6 @@
       {#if formError}<p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700" role="alert">{formError}</p>{/if}
       <div class="mt-5 grid gap-4 sm:grid-cols-2">
         <label><span class="text-sm font-medium text-slate-700">ชื่อ OU</span><input class="app-input mt-2" bind:value={editOuName} maxlength="255" /></label>
-        <label><span class="text-sm font-medium text-slate-700">รหัส OU</span><input class="app-input mt-2 uppercase" bind:value={editOuCode} maxlength="50" /></label>
         <label><span class="text-sm font-medium text-slate-700">ประเภท</span><select class="app-input mt-2" bind:value={editOuType}>{#each ouTypeOptions as item}<option value={item.id}>{item.label}</option>{/each}{#if !ouTypeOptions.some((item) => item.id === editOuType)}<option value={editOuType}>{getOuTypeLabel(editOuType)} (ปิดใช้งานแล้ว)</option>{/if}</select></label>
         <label><span class="text-sm font-medium text-slate-700">OU แม่</span><select class="app-input mt-2 disabled:bg-slate-100" bind:value={editOuParentId} disabled={selectedOu.parentId === null}>{#if selectedOu.parentId === null}<option value="">ไม่มี — Root OU</option>{:else}{#each authorizedOus.filter((ou) => ou.id !== selectedOu.id && !isDescendant(ou.id, selectedOu.id)) as ou}<option value={ou.id}>{'— '.repeat(getDisplayDepth(ou))}{ou.name}</option>{/each}{/if}</select></label>
         <label class="sm:col-span-2"><span class="text-sm font-medium text-slate-700">รายละเอียด</span><textarea class="app-input mt-2 min-h-24 resize-y" bind:value={editOuDescription} maxlength="2000"></textarea></label>
@@ -955,7 +949,7 @@
       {#if editOuAllowDataEntry && !selectedOu.allowDataEntry && hasChildren(selectedOu.id)}
         <label class="mt-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4"><input class="mt-0.5 h-4 w-4 accent-amber-600" type="checkbox" bind:checked={confirmAdditiveParentEntry} /><span class="text-xs leading-5 text-amber-900">ฉันยืนยันว่าข้อมูลตรงของ OU แม่เป็นกิจกรรมคนละส่วนกับ OU ลูก และเข้าใจว่า Backend จะนำมารวมแบบ additive</span></label>
       {/if}
-      <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" class="app-button-secondary" disabled={ouUpdating} on:click={() => (editModalOpen = false)}>ยกเลิก</button><button type="button" class="app-button-primary disabled:opacity-60" disabled={ouUpdating || !editOuName.trim() || !editOuCode.trim() || !editOuType} on:click={saveOu}>{ouUpdating ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}</button></div>
+      <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button type="button" class="app-button-secondary" disabled={ouUpdating} on:click={() => (editModalOpen = false)}>ยกเลิก</button><button type="button" class="app-button-primary disabled:opacity-60" disabled={ouUpdating || !editOuName.trim() || !editOuType} on:click={saveOu}>{ouUpdating ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}</button></div>
     </section>
   </div>
 {/if}

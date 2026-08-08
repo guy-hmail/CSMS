@@ -5,6 +5,28 @@ begin;
 create function pg_temp.assert_true(condition boolean, message text)
 returns void language plpgsql as $$ begin if condition is not true then raise exception 'BE-018 assertion: %', message; end if; end; $$;
 
+-- Keep the seed-based assertions isolated from OUs created during local UI testing.
+update public.organization_units
+set is_active = false, allow_data_entry = false
+where church_id = '81000000-0000-4000-8000-000000000001'
+  and id not in (
+    '84000000-0000-4000-8000-000000000001',
+    '84000000-0000-4000-8000-000000000002',
+    '84000000-0000-4000-8000-000000000003',
+    '84000000-0000-4000-8000-000000000004',
+    '84000000-0000-4000-8000-000000000005'
+  );
+update public.organization_units
+set is_active = true, allow_data_entry = true
+where id in (
+  '84000000-0000-4000-8000-000000000004',
+  '84000000-0000-4000-8000-000000000005'
+);
+update public.statistic_metrics
+set show_on_dashboard = (id = '87000000-0000-4000-8000-000000000001'),
+    dashboard_order = case when id = '87000000-0000-4000-8000-000000000001' then 10 else 0 end
+where church_id = '81000000-0000-4000-8000-000000000001';
+
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '80000000-0000-4000-8000-000000000002', true);
 select set_config('request.jwt.claims', '{"sub":"80000000-0000-4000-8000-000000000002","app_metadata":{"active_church_id":"81000000-0000-4000-8000-000000000001"}}', true);
@@ -38,7 +60,7 @@ values ('89000000-0000-4000-8000-000000000018', '81000000-0000-4000-8000-0000000
 insert into public.statistic_values (church_id, submission_id, metric_id, numeric_value)
 values ('81000000-0000-4000-8000-000000000001', '89000000-0000-4000-8000-000000000018', '87000000-0000-4000-8000-000000000001', 10);
 insert into public.statistic_periods (id, church_id, year, week_no, period_start, period_end, label)
-values ('88000000-0000-4000-8000-000000000018', '81000000-0000-4000-8000-000000000001', 2026, 32, '2026-08-03', '2026-08-09', '2026-W32');
+values ('88000000-0000-4000-8000-000000000018', '81000000-0000-4000-8000-000000000001', 2030, 32, '2030-08-05', '2030-08-11', '2030-W32');
 insert into public.statistic_submissions (id, church_id, period_id, ou_id, status, submitted_by, submitted_at)
 values ('89000000-0000-4000-8000-000000000019', '81000000-0000-4000-8000-000000000001', '88000000-0000-4000-8000-000000000018', '84000000-0000-4000-8000-000000000004', 'submitted', '80000000-0000-4000-8000-000000000001', now());
 insert into public.statistic_values (church_id, submission_id, metric_id, numeric_value)

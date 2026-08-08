@@ -180,14 +180,36 @@
   function exportRows(): ExportRow[] {
     return visibleRows.map((row) => {
       const item = completenessByOu.get(row.ouId);
-      return { ouCode: row.ouCode, ouName: row.ouName, value: row.values[selectedMetricCode] ?? null,
-        expected: item?.expected ?? 0, submitted: item?.submitted ?? 0, approved: item?.approved ?? 0, missing: item?.missing ?? 0 };
+      const status = !item?.submitted ? 'missing' : item.approved === item.expected ? 'approved' : 'partial';
+      return {
+        ouCode: row.ouCode,
+        ouName: row.ouName,
+        values: Object.fromEntries((report?.metrics ?? []).map((metric) => [metric.metricCode, row.values[metric.metricCode] ?? null])),
+        status,
+        expected: item?.expected ?? 0,
+        submitted: item?.submitted ?? 0,
+        approved: item?.approved ?? 0,
+        pending: item?.pending ?? 0,
+        draft: item?.draft ?? 0,
+        returned: item?.returned ?? 0,
+        rejected: item?.rejected ?? 0,
+        missing: item?.missing ?? 0
+      };
     });
   }
   function exportMetadata(): ExportMetadata {
-    return { churchName: report?.church.name ?? '', ouName: report?.ou.name ?? '', ouCode: report?.ou.code ?? 'OU',
-      reportType, periodLabel: selectedPeriod?.label ?? '', metricName: selectedMetric?.metricName ?? '', unit: selectedMetric?.unit ?? '',
-      generatedAt: thaiDateTime.format(new Date()) };
+    return {
+      churchName: report?.church.name ?? '',
+      ouName: report?.ou.name ?? '',
+      ouCode: report?.ou.code ?? 'OU',
+      reportType,
+      periodLabel: selectedPeriod?.label ?? '',
+      metrics: (report?.metrics ?? []).map(({ metricCode, metricName, unit }) => ({ metricCode, metricName, unit })),
+      selectedMetricCode,
+      metricName: selectedMetric?.metricName ?? '',
+      unit: selectedMetric?.unit ?? '',
+      generatedAt: thaiDateTime.format(new Date())
+    };
   }
   async function handleExport(format: 'CSV' | 'Excel' | 'PDF'): Promise<void> {
     if (!report || !selectedMetric) return;
@@ -198,7 +220,7 @@
       if (format === 'CSV') exportCsv(metadata, rows);
       else if (format === 'Excel') await exportExcel(metadata, rows);
       else await exportPdf(metadata, rows);
-      actionMessage = `ส่งออก ${format} สำเร็จ · ${rows.length} หน่วยงาน · ${metadata.generatedAt}`;
+      actionMessage = `ส่งออก ${format} สำเร็จ · ${rows.length} หน่วยงาน · ${metadata.metrics.length} Metrics · ${metadata.generatedAt}`;
     } catch (error) { actionMessage = `ส่งออกไม่สำเร็จ: ${error instanceof Error ? error.message : 'EXPORT_FAILED'}`; }
     finally { exporting = false; }
   }
@@ -262,10 +284,10 @@
     <section class="app-card overflow-hidden" aria-labelledby="detail-title">
       <div class="flex flex-col gap-4 border-b border-slate-100 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between"><div class="flex items-start gap-3"><span class="rounded-2xl bg-sky-50 p-2.5 text-sky-700"><Table2 size={20} /></span><div><h2 id="detail-title" class="app-section-title">เปรียบเทียบหน่วยงาน</h2><p class="app-section-copy">{visibleRows.length} หน่วยงาน · {selectedMetric?.metricName}</p></div></div><div class="flex flex-col gap-2 sm:flex-row"><select class="app-input sm:w-44" bind:value={statusFilter}><option value="all">ทุกสถานะ</option><option value="approved">ครบและอนุมัติแล้ว</option><option value="partial">ส่งบางส่วน</option><option value="missing">ยังไม่ส่ง</option></select><label class="relative"><Search class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} /><input class="app-input pl-10" type="search" placeholder="ค้นหาหน่วยงาน" bind:value={searchQuery} /></label></div></div>
       <div class="overflow-x-auto"><table class="w-full min-w-[760px] text-left"><thead><tr class="border-b bg-slate-50"><th class="px-5 py-3 text-xs text-slate-500">หน่วยงาน</th><th class="px-4 py-3 text-right text-xs text-slate-500">{selectedMetric?.metricName}</th><th class="px-4 py-3 text-right text-xs text-slate-500">คาดหวัง</th><th class="px-4 py-3 text-right text-xs text-slate-500">ส่งแล้ว</th><th class="px-4 py-3 text-right text-xs text-slate-500">อนุมัติ</th><th class="px-5 py-3 text-right text-xs text-slate-500">ขาด</th></tr></thead><tbody>
-        {#each visibleRows as row}{@const item = completenessByOu.get(row.ouId)}<tr class="border-b border-slate-100"><td class="px-5 py-4"><p class="text-sm font-semibold text-slate-900">{row.ouName}</p><p class="text-xs text-slate-500">{row.ouCode}</p></td><td class="px-4 py-4 text-right font-semibold tabular-nums">{row.values[selectedMetricCode] === null ? '—' : row.values[selectedMetricCode]?.toLocaleString()}</td><td class="px-4 py-4 text-right">{item?.expected ?? 0}</td><td class="px-4 py-4 text-right">{item?.submitted ?? 0}</td><td class="px-4 py-4 text-right text-emerald-700">{item?.approved ?? 0}</td><td class="px-5 py-4 text-right text-amber-700">{item?.missing ?? 0}</td></tr>{:else}<tr><td colspan="6" class="px-5 py-14 text-center text-sm text-slate-500">ไม่พบหน่วยงานที่ตรงกับตัวกรอง</td></tr>{/each}</tbody>
+        {#each visibleRows as row}{@const item = completenessByOu.get(row.ouId)}<tr class="border-b border-slate-100"><td class="px-5 py-4"><p class="text-sm font-semibold text-slate-900">{row.ouName}</p></td><td class="px-4 py-4 text-right font-semibold tabular-nums">{row.values[selectedMetricCode] === null ? '—' : row.values[selectedMetricCode]?.toLocaleString()}</td><td class="px-4 py-4 text-right">{item?.expected ?? 0}</td><td class="px-4 py-4 text-right">{item?.submitted ?? 0}</td><td class="px-4 py-4 text-right text-emerald-700">{item?.approved ?? 0}</td><td class="px-5 py-4 text-right text-amber-700">{item?.missing ?? 0}</td></tr>{:else}<tr><td colspan="6" class="px-5 py-14 text-center text-sm text-slate-500">ไม่พบหน่วยงานที่ตรงกับตัวกรอง</td></tr>{/each}</tbody>
         {#if visibleRows.length}<tfoot><tr class="bg-slate-900 text-white"><td class="px-5 py-4 font-semibold">รวมที่แสดง</td><td class="px-4 py-4 text-right font-semibold">{visibleRows.reduce((sum, row) => sum + (row.values[selectedMetricCode] ?? 0), 0).toLocaleString()}</td><td class="px-4 py-4 text-right">{visibleRows.reduce((sum, row) => sum + (completenessByOu.get(row.ouId)?.expected ?? 0), 0)}</td><td class="px-4 py-4 text-right">{visibleRows.reduce((sum, row) => sum + (completenessByOu.get(row.ouId)?.submitted ?? 0), 0)}</td><td class="px-4 py-4 text-right">{visibleRows.reduce((sum, row) => sum + (completenessByOu.get(row.ouId)?.approved ?? 0), 0)}</td><td class="px-5 py-4 text-right">{visibleRows.reduce((sum, row) => sum + (completenessByOu.get(row.ouId)?.missing ?? 0), 0)}</td></tr></tfoot>{/if}
       </table></div>
-      <div class="flex flex-col gap-2 bg-slate-50 px-5 py-4 text-xs text-slate-500 sm:flex-row sm:justify-between"><span>Export ใช้ข้อมูล {visibleRows.length} แถวเดียวกับตารางนี้</span><span>{selectedPeriod?.label} · สร้าง {formatGeneratedAt()}</span></div>
+      <div class="flex flex-col gap-2 bg-slate-50 px-5 py-4 text-xs text-slate-500 sm:flex-row sm:justify-between"><span>CSV/Excel ส่งออก {visibleRows.length} แถว · ครบทั้ง {report.metrics.length} Metric และทุกสถานะ Submission</span><span>{selectedPeriod?.label} · สร้าง {formatGeneratedAt()}</span></div>
     </section>
   {:else if !errorMessage}<section class="app-card px-5 py-14 text-center text-sm text-slate-500">ยังไม่มีข้อมูลสำหรับสร้างรายงาน</section>{/if}
 

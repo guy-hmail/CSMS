@@ -106,11 +106,17 @@ export function assignOuMember(
 }
 
 export function createOrganizationUnit(client: SupabaseClient, payload: Record<string, unknown>) {
-  return callRpc<{ ouId: string }>(client, 'create_organization_unit', { p_payload: payload });
+  return callRpc<{
+    ouId: string;
+    ouCode: string;
+    parentOuId: string;
+    parentOuName: string;
+    parentDataEntryDisabled: boolean;
+  }>(client, 'create_organization_unit', { p_payload: payload });
 }
 
 export function updateOrganizationUnit(client: SupabaseClient, payload: Record<string, unknown>) {
-  return callRpc<{ ouId: string }>(client, 'update_organization_unit', { p_payload: payload });
+  return callRpc<{ ouId: string; ouCode: string }>(client, 'update_organization_unit', { p_payload: payload });
 }
 
 export function softDeleteOrganizationUnit(client: SupabaseClient, payload: Record<string, unknown>) {

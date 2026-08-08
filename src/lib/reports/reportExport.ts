@@ -4,22 +4,61 @@ export type ExportMetadata = {
   ouCode: string;
   reportType: string;
   periodLabel: string;
+  metrics: ExportMetric[];
+  selectedMetricCode: string;
   metricName: string;
   unit: string;
   generatedAt: string;
 };
 
+export type ExportMetric = {
+  metricCode: string;
+  metricName: string;
+  unit: string;
+};
+
 export type ExportRow = {
   ouCode: string;
   ouName: string;
-  value: number | null;
+  values: Record<string, number | null>;
+  status: 'approved' | 'partial' | 'missing';
   expected: number;
   submitted: number;
   approved: number;
+  pending: number;
+  draft: number;
+  returned: number;
+  rejected: number;
   missing: number;
 };
 
-const columns = ['OU Code', 'Organization Unit', 'Value', 'Unit', 'Expected', 'Submitted', 'Approved', 'Missing'];
+const completenessColumns = ['Status', 'Expected', 'Submitted', 'Approved', 'Pending', 'Draft', 'Returned', 'Rejected', 'Missing'];
+
+export function exportColumns(metadata: ExportMetadata): string[] {
+  return [
+    'OU Code',
+    'Organization Unit',
+    ...metadata.metrics.map((metric) => `${metric.metricName} (${metric.unit})`),
+    ...completenessColumns
+  ];
+}
+
+export function exportDetailRow(metadata: ExportMetadata, row: ExportRow): Array<string | number | null> {
+  return [
+    row.ouCode,
+    row.ouName,
+    ...metadata.metrics.map((metric) => row.values[metric.metricCode] ?? null),
+    row.status,
+    row.expected,
+    row.submitted,
+    row.approved,
+    row.pending,
+    row.draft,
+    row.returned,
+    row.rejected,
+    row.missing
+  ];
+}
 
 function escapeCsv(value: unknown): string {
   const text = value === null || value === undefined ? '' : String(value);
@@ -45,10 +84,13 @@ export function exportCsv(metadata: ExportMetadata, rows: ExportRow[]): void {
   const metadataRows = [
     ['Church', metadata.churchName], ['Organization Unit', metadata.ouName],
     ['Report Type', metadata.reportType], ['Period', metadata.periodLabel],
-    ['Metric', `${metadata.metricName} (${metadata.unit})`], ['Generated At', metadata.generatedAt]
+    ['Matrix Metrics', String(metadata.metrics.length)],
+    ['Generated At', metadata.generatedAt]
   ];
-  const detailRows = rows.map((row) => [row.ouCode, row.ouName, row.value, metadata.unit, row.expected, row.submitted, row.approved, row.missing]);
-  const csv = [...metadataRows, [], columns, ...detailRows].map((row) => row.map(escapeCsv).join(',')).join('\r\n');
+  const detailRows = rows.map((row) => exportDetailRow(metadata, row));
+  const csv = [...metadataRows, [], exportColumns(metadata), ...detailRows]
+    .map((row) => row.map(escapeCsv).join(','))
+    .join('\r\n');
   download(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }), `${reportFileBase(metadata)}.csv`);
 }
 
@@ -59,15 +101,24 @@ export async function exportExcel(metadata: ExportMetadata, rows: ExportRow[]): 
     [header('Field'), header('Value')],
     ['Church', metadata.churchName], ['Organization Unit', metadata.ouName],
     ['Report Type', metadata.reportType], ['Period', metadata.periodLabel],
-    ['Metric', `${metadata.metricName} (${metadata.unit})`], ['Generated At', metadata.generatedAt]
+    ['Matrix Metrics', String(metadata.metrics.length)],
+    ['Metric Columns', metadata.metrics.map((metric) => `${metric.metricName} (${metric.unit})`).join(', ')],
+    ['Generated At', metadata.generatedAt]
   ];
-  const detail = [columns.map(header), ...rows.map((row) => [
-    row.ouCode, row.ouName, row.value, metadata.unit,
-    row.expected, row.submitted, row.approved, row.missing
-  ])];
+  const detail = [
+    exportColumns(metadata).map(header),
+    ...rows.map((row) => exportDetailRow(metadata, row))
+  ];
+  const detailColumns = [
+    { width: 16 },
+    { width: 32 },
+    ...metadata.metrics.map(() => ({ width: 22 })),
+    { width: 14 },
+    ...completenessColumns.slice(1).map(() => ({ width: 12 }))
+  ];
   await writeXlsxFile([
     { sheet: 'Summary', data: summary, columns: [{ width: 24 }, { width: 44 }], stickyRowsCount: 1 },
-    { sheet: 'Detail', data: detail, columns: [{ width: 16 }, { width: 32 }, { width: 14 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 12 }], stickyRowsCount: 1 }
+    { sheet: 'Matrix', data: detail, columns: detailColumns, stickyRowsCount: 1 }
   ]).toFile(`${reportFileBase(metadata)}.xlsx`);
 }
 
@@ -114,7 +165,7 @@ export async function exportPdf(metadata: ExportMetadata, rows: ExportRow[]): Pr
       if (rowIndex % 2) { context.fillStyle = '#f8fafc'; context.fillRect(70, y, 1100, 48); }
       context.fillStyle = '#1e293b';
       x = 70;
-      const values = [row.ouCode, row.ouName, row.value ?? '—', row.expected, row.submitted, row.approved, row.missing];
+      const values = [row.ouCode, row.ouName, row.values[metadata.selectedMetricCode] ?? '—', row.expected, row.submitted, row.approved, row.missing];
       values.forEach((value, index) => { context.fillText(String(value), x + 10, y + 31, widths[index] - 20); x += widths[index]; });
       y += 48;
     });

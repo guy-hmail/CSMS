@@ -803,7 +803,7 @@ Required fields:
 Metric selector must include:
 
 ```text
-church_id = current church OR church_id IS NULL
+church_id = current church
 ```
 
 Only active metrics:
@@ -817,6 +817,10 @@ Sort by:
 ```text
 category, sort_order, name
 ```
+
+The selector includes both active input metrics and active calculated metrics returned by the report API. Calculated metrics are read-only `SUM` formulas defined in Tenant Settings and evaluated from approved source values for the selected OU subtree and date range. They are not shown in Submission forms and are included in dynamic CSV/Excel exports.
+
+Dashboard metric visibility is configured separately in Tenant Settings. A Root OU Admin can select any active numeric Raw or Calculated metric and assign its display order. Dashboard KPI cards, the trend selector, and child OU comparison must use only this ordered selection; Reports continue to expose every active report metric.
 
 ---
 
@@ -875,6 +879,8 @@ Detail sheet:
 ```text
 OU rows + dynamic metric columns
 ```
+
+Metric headers display the business name and unit only. Internal metric codes remain available for data mapping and formula evaluation but must not appear in Excel or CSV output.
 
 ---
 

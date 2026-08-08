@@ -15,7 +15,7 @@
   <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sky-500 via-cyan-400 to-emerald-400"></div>
   <div class="flex items-start justify-between gap-3">
     <button type="button" class="min-w-0 flex-1 text-left" aria-pressed={selected} on:click={onSelect}>
-      <p class="truncate text-sm font-medium text-slate-600">{item.metricName}</p>
+      <div class="flex items-center gap-2"><p class="truncate text-sm font-medium text-slate-600">{item.metricName}</p>{#if item.metricKind === 'calculated'}<span class="shrink-0 rounded-full bg-violet-50 px-2 py-0.5 text-[0.62rem] font-semibold text-violet-700">Calculated</span>{/if}</div>
       <p class="mt-2 flex items-baseline gap-1.5 text-2xl font-semibold tracking-tight text-slate-950 sm:text-[1.75rem]">
         <span>{item.value.toLocaleString()}</span><span class="text-xs font-medium text-slate-500">{item.unit}</span>
       </p>

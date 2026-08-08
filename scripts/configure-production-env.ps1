@@ -56,9 +56,15 @@ $publishableKey = ($apiKeys |
     Select-Object -First 1).api_key
 $localEnvironment = Get-DotEnvValues '.env'
 $supabaseUrl = "https://$ProjectRef.supabase.co"
+$productionLiffId = $localEnvironment['PUBLIC_LINE_LIFF_PRODUCTION_ID']
+$developmentLiffId = $localEnvironment['PUBLIC_LINE_LIFF_ID']
+$productionAppUrl = $localEnvironment['PUBLIC_PRODUCTION_APP_URL']
 
 Add-VercelEnvironmentVariable 'PUBLIC_SUPABASE_URL' 'production,preview' $supabaseUrl
 Add-VercelEnvironmentVariable 'PUBLIC_SUPABASE_ANON_KEY' 'production,preview' $publishableKey
-Add-VercelEnvironmentVariable 'PUBLIC_LINE_LIFF_ID' 'production,preview' $localEnvironment['PUBLIC_LINE_LIFF_ID']
+Add-VercelEnvironmentVariable 'PUBLIC_LINE_LIFF_ID' 'production' $productionLiffId
+Add-VercelEnvironmentVariable 'PUBLIC_LINE_LIFF_ID' 'preview' $developmentLiffId
+Add-VercelEnvironmentVariable 'PUBLIC_LINE_LIFF_PRODUCTION_ID' 'production,preview' $productionLiffId
+Add-VercelEnvironmentVariable 'PUBLIC_PRODUCTION_APP_URL' 'production,preview' $productionAppUrl
 Add-VercelEnvironmentVariable 'PUBLIC_APP_ENV' 'production' 'production'
 Add-VercelEnvironmentVariable 'PUBLIC_APP_ENV' 'preview' 'preview'

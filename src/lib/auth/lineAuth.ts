@@ -1,6 +1,7 @@
 import type { Liff } from '@line/liff';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { env } from '$env/dynamic/public';
+import { extractRuntimeLiffId, normalizeLiffId } from './liffConfig';
 
 export type LineTenantOption = {
   tenantId: string;
@@ -32,7 +33,9 @@ type LineAuthResponse = {
 let liffInstance: Liff | undefined;
 
 export async function initializeLiff(): Promise<Liff> {
-  const liffId = env.PUBLIC_LINE_LIFF_ID;
+  const liffId = typeof window === 'undefined'
+    ? normalizeLiffId(env.PUBLIC_LINE_LIFF_ID)
+    : extractRuntimeLiffId(window.location.search) || normalizeLiffId(env.PUBLIC_LINE_LIFF_ID);
   if (!liffId || liffId === 'replace-with-line-liff-id') {
     throw new Error('ยังไม่ได้ตั้งค่า PUBLIC_LINE_LIFF_ID');
   }

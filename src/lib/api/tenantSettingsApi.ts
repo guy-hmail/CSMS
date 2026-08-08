@@ -32,6 +32,16 @@ export type StatisticMetricPayload = {
   sortOrder: number;
 };
 
+export type CalculatedMetricPayload = {
+  code: string;
+  name: string;
+  description: string;
+  category: string;
+  unit: string;
+  sortOrder: number;
+  sourceMetricIds: string[];
+};
+
 export function updateTenantSettings(
   client: SupabaseClient,
   payload: TenantSettingsPayload
@@ -76,5 +86,25 @@ export function updateStatisticMetric(
 ) {
   return callRpc<{ metricId: string }>(client, 'update_statistic_metric', {
     p_payload: { metricId, ...payload }
+  });
+}
+
+export function createCalculatedMetric(client: SupabaseClient, payload: CalculatedMetricPayload) {
+  return callRpc<{ metricId: string }>(client, 'create_calculated_metric', { p_payload: payload });
+}
+
+export function updateCalculatedMetric(
+  client: SupabaseClient,
+  metricId: string,
+  payload: Omit<CalculatedMetricPayload, 'code'> & { isActive: boolean }
+) {
+  return callRpc<{ metricId: string }>(client, 'update_calculated_metric', {
+    p_payload: { metricId, ...payload }
+  });
+}
+
+export function updateDashboardMetricSettings(client: SupabaseClient, metricIds: string[]) {
+  return callRpc<{ metricCount: number }>(client, 'update_dashboard_metric_settings', {
+    p_payload: { metricIds }
   });
 }

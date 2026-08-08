@@ -51,7 +51,7 @@
     try {
       const data = await getWeeklySubmissionContext(getSupabaseBrowserClient());
       periods = data.periods.map((period) => ({ id: period.id, label: formatDate(period.periodEnd), helperText: `${formatDate(period.periodStart)} – ${formatDate(period.periodEnd)} · สัปดาห์ที่ ${period.weekNo}` }));
-      organizationUnits = data.organizationUnits.map((ou) => ({ id: ou.id, label: ou.name, helperText: ou.code }));
+      organizationUnits = data.organizationUnits.map((ou) => ({ id: ou.id, label: ou.name }));
       metrics = data.metrics;
       metricValues = emptyValues();
       selectedPeriodId = periods[0]?.id ?? '';

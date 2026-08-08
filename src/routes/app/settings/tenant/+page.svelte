@@ -1,15 +1,20 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { env } from '$env/dynamic/public';
   import {
-    ArrowLeft, BarChart3, Building2, CheckCircle2, CirclePlus, Info, ListTree,
-    LockKeyhole, Pencil, Save, ShieldCheck, SlidersHorizontal, X
+    ArrowLeft, BarChart3, BellRing, Building2, Calculator, CheckCircle2, CirclePlus, Copy, ExternalLink, Info, LayoutDashboard, ListTree,
+    Link2, LockKeyhole, Pencil, Save, ShieldCheck, SlidersHorizontal, X
   } from '@lucide/svelte';
+  import { normalizeLiffId } from '$lib/auth/liffConfig';
   import { tenantContext } from '$lib/stores/tenantContext';
   import { getSupabaseBrowserClient } from '$lib/supabase/browser';
   import {
     createOrganizationUnitType,
+    createCalculatedMetric,
     createStatisticMetric,
     updateOrganizationUnitType,
+    updateCalculatedMetric,
+    updateDashboardMetricSettings,
     updateStatisticMetric,
     updateTenantSettings
   } from '$lib/api/tenantSettingsApi';
@@ -18,6 +23,7 @@
   type DataType = 'number' | 'text' | 'boolean';
   type InputType = 'number' | 'text' | 'checkbox';
   type Aggregation = 'sum' | 'avg' | 'max' | 'min' | 'none';
+  type MetricKind = 'input' | 'calculated';
   type OuTypeSetting = {
     id: string;
     name: string;
@@ -45,6 +51,11 @@
     maxValue: number | null;
     sortOrder: number;
     active: boolean;
+    metricKind: MetricKind;
+    calculationOperator: 'sum' | null;
+    calculationSourceMetricIds: string[];
+    dashboardVisible: boolean;
+    dashboardOrder: number;
   };
 
   let activeTab: Tab = 'general';
@@ -85,9 +96,18 @@
   let metricMinValue: number | null = 0;
   let metricMaxValue: number | null = null;
   let metricSortOrder = 10;
+  let metricKind: MetricKind = 'input';
+  let metricSourceIds: string[] = [];
 
   $: activeOuCount = ouTypes.filter((item) => item.active).length;
   $: activeMetricCount = metrics.filter((item) => item.active).length;
+  $: calculationSourceOptions = metrics.filter((item) => item.active && item.metricKind === 'input' && item.dataType === 'number' && item.aggregation === 'sum' && item.id !== editingMetricId);
+  $: dashboardMetricOptions = metrics.filter((item) => item.active && item.dataType === 'number' && item.aggregation !== 'none');
+  $: selectedDashboardMetricCount = dashboardMetricOptions.filter((item) => item.dashboardVisible).length;
+  $: formulaPreview = metricSourceIds.map((id) => metrics.find((item) => item.id === id)?.name).filter(Boolean).join(' + ');
+  $: productionLiffId = normalizeLiffId(env.PUBLIC_LINE_LIFF_PRODUCTION_ID || env.PUBLIC_LINE_LIFF_ID);
+  $: productionLiffUrl = productionLiffId ? `https://liff.line.me/${productionLiffId}` : '';
+  $: productionAppUrl = (env.PUBLIC_PRODUCTION_APP_URL || '').replace(/\/$/, '');
 
   async function loadSettings(showLoading = true): Promise<void> {
     if (showLoading) settingsLoading = true;
@@ -108,7 +128,7 @@
           .select('ou_type_id,name,parent_id,level'),
         client
           .from('statistic_metrics')
-          .select('id,code,name,description,category,unit,data_type,input_type,aggregation,default_value,is_required,min_value,max_value,sort_order,is_active')
+          .select('id,code,name,description,category,unit,data_type,input_type,aggregation,default_value,is_required,min_value,max_value,sort_order,is_active,metric_kind,calculation_operator,calculation_source_metric_ids,show_on_dashboard,dashboard_order')
           .is('deleted_at', null)
           .order('sort_order')
       ]);
@@ -158,7 +178,12 @@
         minValue: item.min_value === null ? null : Number(item.min_value),
         maxValue: item.max_value === null ? null : Number(item.max_value),
         sortOrder: item.sort_order,
-        active: item.is_active
+        active: item.is_active,
+        metricKind: item.metric_kind as MetricKind,
+        calculationOperator: item.calculation_operator as 'sum' | null,
+        calculationSourceMetricIds: item.calculation_source_metric_ids ?? [],
+        dashboardVisible: item.show_on_dashboard,
+        dashboardOrder: item.dashboard_order
       }));
     } catch (error) {
       settingsError = error instanceof Error ? error.message : 'ไม่สามารถโหลด Tenant Settings ได้';
@@ -262,6 +287,8 @@
     metricMinValue = 0;
     metricMaxValue = null;
     metricSortOrder = Math.max(0, ...metrics.map((item) => item.sortOrder)) + 10;
+    metricKind = 'input';
+    metricSourceIds = [];
     metricModalOpen = true;
   }
 
@@ -279,11 +306,17 @@
     metricMinValue = item.minValue;
     metricMaxValue = item.maxValue;
     metricSortOrder = item.sortOrder;
+    metricKind = item.metricKind;
+    metricSourceIds = [...item.calculationSourceMetricIds];
     metricModalOpen = true;
   }
 
   async function saveMetric(): Promise<void> {
     if (!metricName.trim() || !metricCode.trim()) return;
+    if (metricKind === 'calculated' && metricSourceIds.length < 2) {
+      mutationError = 'Calculated Field ต้องเลือก Field ต้นทางอย่างน้อย 2 รายการ';
+      return;
+    }
     const values = {
       name: metricName.trim(),
       description: metricDescription.trim(),
@@ -301,7 +334,24 @@
     mutationError = '';
     try {
       const client = getSupabaseBrowserClient();
-      if (editingMetricId) {
+      if (metricKind === 'calculated') {
+        const calculatedValues = {
+          name: values.name,
+          description: values.description,
+          category: values.category,
+          unit: values.unit,
+          sortOrder: values.sortOrder,
+          sourceMetricIds: metricSourceIds
+        };
+        if (editingMetricId) {
+          const current = metrics.find((item) => item.id === editingMetricId);
+          await updateCalculatedMetric(client, editingMetricId, { ...calculatedValues, isActive: current?.active ?? true });
+          toastMessage = `แก้ไข Calculated Field “${metricName.trim()}” แล้ว`;
+        } else {
+          await createCalculatedMetric(client, { code: metricCode.trim().toUpperCase(), ...calculatedValues });
+          toastMessage = `เพิ่ม Calculated Field “${metricName.trim()}” แล้ว`;
+        }
+      } else if (editingMetricId) {
         const current = metrics.find((item) => item.id === editingMetricId);
         await updateStatisticMetric(client, editingMetricId, {
           name: values.name,
@@ -339,19 +389,18 @@
     mutationBusy = true;
     mutationError = '';
     try {
-      await updateStatisticMetric(getSupabaseBrowserClient(), id, {
-        name: item.name,
-        description: item.description,
-        category: item.category,
-        unit: item.unit,
-        aggregation: item.aggregation,
-        defaultValue: item.defaultValue,
-        minValue: item.minValue,
-        maxValue: item.maxValue,
-        isRequired: item.required,
-        sortOrder: item.sortOrder,
-        isActive: !item.active
-      });
+      if (item.metricKind === 'calculated') {
+        await updateCalculatedMetric(getSupabaseBrowserClient(), id, {
+          name: item.name, description: item.description, category: item.category, unit: item.unit,
+          sortOrder: item.sortOrder, sourceMetricIds: item.calculationSourceMetricIds, isActive: !item.active
+        });
+      } else {
+        await updateStatisticMetric(getSupabaseBrowserClient(), id, {
+          name: item.name, description: item.description, category: item.category, unit: item.unit,
+          aggregation: item.aggregation, defaultValue: item.defaultValue, minValue: item.minValue,
+          maxValue: item.maxValue, isRequired: item.required, sortOrder: item.sortOrder, isActive: !item.active
+        });
+      }
       toastMessage = 'อัปเดตสถานะ Field สถิติแล้ว';
       await loadSettings(false);
     } catch (error) {
@@ -361,11 +410,57 @@
     }
   }
 
+  function toggleDashboardMetric(id: string): void {
+    const item = metrics.find((candidate) => candidate.id === id);
+    if (!item) return;
+    item.dashboardVisible = !item.dashboardVisible;
+    if (item.dashboardVisible && item.dashboardOrder <= 0) {
+      item.dashboardOrder = Math.max(0, ...metrics.filter((metric) => metric.dashboardVisible).map((metric) => metric.dashboardOrder)) + 10;
+    }
+    metrics = [...metrics];
+  }
+
+  async function saveDashboardMetrics(): Promise<void> {
+    const selectedIds = dashboardMetricOptions
+      .filter((item) => item.dashboardVisible)
+      .sort((left, right) => left.dashboardOrder - right.dashboardOrder || left.sortOrder - right.sortOrder || left.name.localeCompare(right.name))
+      .map((item) => item.id);
+    if (!selectedIds.length) {
+      mutationError = 'กรุณาเลือก Matrix สำหรับ Dashboard อย่างน้อย 1 รายการ';
+      return;
+    }
+    mutationBusy = true;
+    mutationError = '';
+    try {
+      await updateDashboardMetricSettings(getSupabaseBrowserClient(), selectedIds);
+      toastMessage = `บันทึก Matrix สำหรับ Dashboard ${selectedIds.length} รายการแล้ว`;
+      await loadSettings(false);
+    } catch (error) {
+      mutationError = error instanceof Error ? error.message : 'บันทึกการตั้งค่า Dashboard ไม่สำเร็จ';
+    } finally {
+      mutationBusy = false;
+    }
+  }
+
+  function toggleMetricSource(metricId: string): void {
+    metricSourceIds = metricSourceIds.includes(metricId)
+      ? metricSourceIds.filter((id) => id !== metricId)
+      : [...metricSourceIds, metricId];
+  }
+
+  function metricFormula(item: MetricSetting): string {
+    return item.calculationSourceMetricIds
+      .map((id) => metrics.find((candidate) => candidate.id === id)?.name)
+      .filter((name): name is string => Boolean(name))
+      .join(' + ');
+  }
+
   async function saveGeneralSettings(): Promise<void> {
     mutationBusy = true;
     mutationError = '';
     try {
-      await updateTenantSettings(getSupabaseBrowserClient(), {
+      const client = getSupabaseBrowserClient();
+      await updateTenantSettings(client, {
         name: tenantName.trim(),
         timezone: tenantTimezone,
         approvalMode: tenantApprovalMode as 'auto_approve' | 'approval_required',
@@ -379,6 +474,12 @@
     } finally {
       mutationBusy = false;
     }
+  }
+
+  async function copyPlatformLink(value: string, label: string): Promise<void> {
+    if (!value) return;
+    await navigator.clipboard.writeText(value);
+    toastMessage = `คัดลอก ${label} แล้ว`;
   }
 </script>
 
@@ -432,8 +533,27 @@
           <label><span class="text-sm font-medium text-slate-700">Timezone</span><select class="app-input mt-2" bind:value={tenantTimezone}><option>Asia/Bangkok</option><option>Asia/Singapore</option><option>UTC</option></select></label>
           <label><span class="text-sm font-medium text-slate-700">วันสิ้นสุดรอบรายงาน</span><select class="app-input mt-2" bind:value={tenantWeekEndsOn}><option value="0">วันอาทิตย์</option><option value="6">วันเสาร์</option></select></label>
           <label><span class="text-sm font-medium text-slate-700">โหมดอนุมัติ</span><select class="app-input mt-2" bind:value={tenantApprovalMode}><option value="auto_approve">อนุมัติอัตโนมัติ</option><option value="approval_required">ต้องผ่านผู้อนุมัติ</option></select></label>
-          <label><span class="text-sm font-medium text-slate-700">Primary KPI</span><select class="app-input mt-2" bind:value={tenantPrimaryMetricId}>{#each metrics.filter((item) => item.active && item.dataType === 'number') as item}<option value={item.id}>{item.name}</option>{/each}</select></label>
+          <label><span class="text-sm font-medium text-slate-700">Primary KPI</span><select class="app-input mt-2" bind:value={tenantPrimaryMetricId}>{#each metrics.filter((item) => item.active && item.metricKind === 'input' && item.dataType === 'number') as item}<option value={item.id}>{item.name}</option>{/each}</select></label>
         </fieldset>
+        <section class="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 sm:p-5" aria-labelledby="line-platform-title">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div><h3 id="line-platform-title" class="flex items-center gap-2 text-sm font-semibold text-emerald-950"><Link2 size={17} /> LINE OA & Rich Menu</h3><p class="mt-1 text-xs leading-5 text-emerald-800">Platform เป็นผู้ดูแล LINE Login และ LIFF กลาง Tenant ใช้ URL นี้สร้างปุ่ม Link/URI ใน Rich Menu ของ LINE OA โดยไม่ต้องตั้ง LIFF ID เอง</p></div>
+            <span class="w-fit rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-[0.68rem] font-semibold text-emerald-700">Read-only</span>
+          </div>
+          <div class="mt-4 grid gap-3 lg:grid-cols-2">
+            <article class="rounded-2xl border border-emerald-100 bg-white p-4">
+              <p class="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700">Production Rich Menu URL</p>
+              <p class="mt-2 break-all text-sm font-semibold text-slate-900">{productionLiffUrl || 'Platform ยังไม่ได้ตั้งค่า Production LIFF URL'}</p>
+              <div class="mt-3 flex flex-wrap gap-2"><button type="button" class="app-button-secondary min-h-0 px-3 py-2 text-xs" disabled={!productionLiffUrl} on:click={() => copyPlatformLink(productionLiffUrl, 'Rich Menu URL')}><Copy size={14} /> คัดลอก</button>{#if productionLiffUrl}<a class="app-button-secondary min-h-0 px-3 py-2 text-xs" href={productionLiffUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} /> เปิดทดสอบ</a>{/if}</div>
+            </article>
+            <article class="rounded-2xl border border-sky-100 bg-white p-4">
+              <p class="text-xs font-semibold uppercase tracking-[0.12em] text-sky-700">Production Web URL</p>
+              <p class="mt-2 break-all text-sm font-semibold text-slate-900">{productionAppUrl || 'Platform ยังไม่ได้ตั้งค่า Production App URL'}</p>
+              <div class="mt-3"><button type="button" class="app-button-secondary min-h-0 px-3 py-2 text-xs" disabled={!productionAppUrl} on:click={() => copyPlatformLink(productionAppUrl, 'Web URL')}><Copy size={14} /> คัดลอก</button></div>
+            </article>
+          </div>
+          <div class="mt-4 flex gap-3 rounded-2xl border border-violet-200 bg-violet-50 p-4"><BellRing class="mt-0.5 shrink-0 text-violet-700" size={18} /><div><p class="text-sm font-semibold text-violet-950">เส้นทาง Notification: CSMS LINE OA กลาง</p><p class="mt-1 text-xs leading-5 text-violet-800">Tenant OA ใช้ Rich Menu เพื่อพาผู้ใช้เข้า CSMS เมื่อเปิดใช้บริการส่ง Notification ระบบจะส่งการเตือนผ่าน OA กลางของ Platform โดย Credential และการเปิดบริการเป็นการตั้งค่าระดับ Platform ไม่ใช่ Tenant Settings</p></div></div>
+        </section>
         <div class="mt-5 flex justify-end"><button type="button" class="app-button-primary inline-flex items-center gap-2" disabled={mutationBusy || settingsLoading} on:click={saveGeneralSettings}><Save size={16} /> {mutationBusy ? 'กำลังบันทึก...' : 'บันทึกค่าทั่วไป'}</button></div>
       </div>
     {:else if activeTab === 'ou-types'}
@@ -463,18 +583,37 @@
     {:else}
       <div class="border-b border-slate-100 p-4 sm:p-5">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div><h2 class="app-section-title">Field สถิติของ Tenant</h2><p class="app-section-copy">Field ที่เปิดใช้งานจะถูกนำไปสร้างแบบฟอร์มหน้า Submissions อัตโนมัติ</p></div>
+          <div><h2 class="app-section-title">Field สถิติของ Tenant</h2><p class="app-section-copy">Input Field ใช้ในหน้า Submissions ส่วน Calculated Field คำนวณจากข้อมูลที่อนุมัติแล้ว สามารถเลือกทั้งสองชนิดไปแสดงบน Dashboard ได้</p></div>
           <button type="button" class="app-button-primary app-focus inline-flex items-center justify-center gap-2" disabled={mutationBusy} on:click={openCreateMetric}><CirclePlus size={17} /> เพิ่ม Field</button>
         </div>
       </div>
+      <section class="border-b border-sky-100 bg-sky-50/50 p-4 sm:p-5" aria-labelledby="dashboard-metric-title">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div><h3 id="dashboard-metric-title" class="flex items-center gap-2 text-sm font-semibold text-sky-950"><LayoutDashboard size={17} /> Matrix บน Dashboard</h3><p class="mt-1 text-xs leading-5 text-sky-800">เลือก Raw หรือ Calculated Matrix ที่ต้องการแสดง และกำหนดเลขลำดับจากน้อยไปมาก Dashboard จะแสดงเฉพาะรายการที่เลือก</p></div>
+          <span class="w-fit rounded-full border border-sky-200 bg-white px-2.5 py-1 text-xs font-semibold text-sky-700">เลือกแล้ว {selectedDashboardMetricCount}</span>
+        </div>
+        <div class="mt-4 grid gap-2 lg:grid-cols-2">
+          {#each dashboardMetricOptions as item}
+            <article class={`flex items-center gap-3 rounded-2xl border p-3 transition ${item.dashboardVisible ? 'border-sky-300 bg-white shadow-sm' : 'border-slate-200 bg-white/60'}`}>
+              <input class="h-5 w-5 shrink-0 accent-sky-600" type="checkbox" checked={item.dashboardVisible} aria-label={`แสดง ${item.name} บน Dashboard`} on:change={() => toggleDashboardMetric(item.id)} />
+              <div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold text-slate-900">{item.name}</p><p class="mt-0.5 text-xs text-slate-500">{item.metricKind === 'calculated' ? 'Calculated' : 'Raw Input'} · {item.unit}</p></div>
+              <label class="w-20"><span class="sr-only">ลำดับ {item.name}</span><input class="app-input min-h-9 px-2 py-1.5 text-center text-sm" type="number" min="1" step="1" bind:value={item.dashboardOrder} disabled={!item.dashboardVisible} aria-label={`ลำดับของ ${item.name}`} /></label>
+            </article>
+          {:else}
+            <p class="rounded-2xl border border-dashed border-sky-200 bg-white/60 px-4 py-6 text-center text-xs text-slate-500 lg:col-span-2">ยังไม่มี Matrix ตัวเลขที่เปิดใช้งาน</p>
+          {/each}
+        </div>
+        <div class="mt-4 flex items-center justify-between gap-3"><p class="text-xs text-sky-700">แนะนำ 4–6 รายการ เพื่อให้ Dashboard อ่านง่าย</p><button type="button" class="app-button-primary inline-flex items-center gap-2" disabled={mutationBusy || selectedDashboardMetricCount === 0} on:click={saveDashboardMetrics}><Save size={15} /> บันทึก Dashboard</button></div>
+      </section>
       <div class="divide-y divide-slate-100">
         {#each metrics as item}
           <article class="grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_8rem_8rem_11rem] lg:items-center">
             <div class="min-w-0">
-              <div class="flex flex-wrap items-center gap-2"><h3 class="text-sm font-semibold text-slate-950">{item.name}</h3>{#if item.required}<span class="rounded-full bg-amber-50 px-2 py-0.5 text-[0.68rem] font-semibold text-amber-700">บังคับกรอก</span>{/if}</div>
+              <div class="flex flex-wrap items-center gap-2"><h3 class="text-sm font-semibold text-slate-950">{item.name}</h3>{#if item.metricKind === 'calculated'}<span class="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[0.68rem] font-semibold text-violet-700"><Calculator size={11} /> Calculated</span>{:else if item.required}<span class="rounded-full bg-amber-50 px-2 py-0.5 text-[0.68rem] font-semibold text-amber-700">บังคับกรอก</span>{/if}</div>
               <p class="mt-1 text-xs text-slate-500">{item.code} · {item.dataType} · หน่วย {item.unit} · ลำดับ {item.sortOrder}</p>
+              {#if item.metricKind === 'calculated'}<p class="mt-1 text-xs font-medium text-violet-700">สูตร: {metricFormula(item) || 'ยังไม่พบ Field ต้นทาง'}</p>{/if}
             </div>
-            <p class="text-xs text-slate-500">{item.minValue !== null ? `ขั้นต่ำ ${item.minValue}` : 'ไม่จำกัดค่า'}</p>
+            <p class="text-xs text-slate-500">{item.metricKind === 'calculated' ? 'แสดงใน Report' : item.minValue !== null ? `ขั้นต่ำ ${item.minValue}` : 'ไม่จำกัดค่า'}</p>
             <span class={`w-fit rounded-full border px-2.5 py-1 text-xs font-semibold ${item.active ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-500'}`}>{item.active ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}</span>
             <div class="flex gap-2 lg:justify-end">
               <button type="button" class="app-button-secondary app-focus min-h-0 px-3 py-2" disabled={mutationBusy} on:click={() => openEditMetric(item)} aria-label={`แก้ไข ${item.name}`}><Pencil size={15} /></button>
@@ -508,22 +647,40 @@
   <div class="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" role="presentation">
     <button class="absolute inset-0 bg-slate-950/50" type="button" aria-label="ปิด" on:click={() => (metricModalOpen = false)}></button>
     <div class="relative z-10 max-h-[95vh] w-full max-w-3xl overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl" role="dialog" aria-modal="true" aria-labelledby="metric-dialog-title">
-      <div class="flex items-start justify-between border-b border-slate-100 p-5"><div><h2 id="metric-dialog-title" class="text-lg font-semibold text-slate-950">{editingMetricId ? 'แก้ไข Field สถิติ' : 'เพิ่ม Field สถิติ'}</h2><p class="mt-1 text-xs text-slate-500">Field จะปรากฏในแบบฟอร์มของทั้งองค์กร</p></div><button type="button" class="text-slate-400" on:click={() => (metricModalOpen = false)}><X size={20} /></button></div>
+      <div class="flex items-start justify-between border-b border-slate-100 p-5"><div><h2 id="metric-dialog-title" class="text-lg font-semibold text-slate-950">{editingMetricId ? 'แก้ไข Field สถิติ' : 'เพิ่ม Field สถิติ'}</h2><p class="mt-1 text-xs text-slate-500">เลือกสร้าง Field สำหรับกรอกข้อมูล หรือสูตรคำนวณสำหรับ Report</p></div><button type="button" class="text-slate-400" on:click={() => (metricModalOpen = false)}><X size={20} /></button></div>
       <div class="grid gap-4 p-5 sm:grid-cols-2">
+        <label class="sm:col-span-2"><span class="text-sm font-medium text-slate-700">ชนิด Field</span><select class="app-input mt-2" bind:value={metricKind} disabled={editingMetricId !== null}><option value="input">Input Field — ผู้ใช้กรอกใน Submissions</option><option value="calculated">Calculated Field — ระบบคำนวณและแสดงใน Report</option></select></label>
         <label><span class="text-sm font-medium text-slate-700">ชื่อแสดงผล</span><input class="app-input mt-2" bind:value={metricName} placeholder="เช่น ผู้ใหญ่มาคจ." /></label>
         <label><span class="text-sm font-medium text-slate-700">Metric Code</span><input class="app-input mt-2 uppercase" bind:value={metricCode} disabled={editingMetricId !== null} placeholder="ATTENDANCE" /></label>
         <label><span class="text-sm font-medium text-slate-700">หมวดหมู่</span><input class="app-input mt-2" bind:value={metricCategory} placeholder="attendance" /></label>
         <label><span class="text-sm font-medium text-slate-700">หน่วย</span><input class="app-input mt-2" bind:value={metricUnit} placeholder="คน" /></label>
-        <label><span class="text-sm font-medium text-slate-700">ประเภทข้อมูล</span><select class="app-input mt-2" bind:value={metricDataType} disabled={editingMetricId !== null}><option value="number">จำนวน (number)</option><option value="text">ข้อความ (text)</option><option value="boolean">ใช่/ไม่ใช่ (boolean)</option></select></label>
-        <label><span class="text-sm font-medium text-slate-700">วิธีรวมผล</span><select class="app-input mt-2" bind:value={metricAggregation} disabled={metricDataType !== 'number'}><option value="sum">ผลรวม (sum)</option><option value="avg">ค่าเฉลี่ย (avg)</option><option value="max">ค่าสูงสุด (max)</option><option value="min">ค่าต่ำสุด (min)</option><option value="none">ไม่รวมผล (none)</option></select></label>
-        <label><span class="text-sm font-medium text-slate-700">ค่าเริ่มต้น</span><input class="app-input mt-2" type="number" bind:value={metricDefaultValue} disabled={metricDataType !== 'number'} /></label>
-        <label><span class="text-sm font-medium text-slate-700">ค่าต่ำสุด</span><input class="app-input mt-2" type="number" bind:value={metricMinValue} disabled={metricDataType !== 'number'} /></label>
-        <label><span class="text-sm font-medium text-slate-700">ค่าสูงสุด</span><input class="app-input mt-2" type="number" bind:value={metricMaxValue} disabled={metricDataType !== 'number'} placeholder="ไม่จำกัด" /></label>
+        {#if metricKind === 'input'}
+          <label><span class="text-sm font-medium text-slate-700">ประเภทข้อมูล</span><select class="app-input mt-2" bind:value={metricDataType} disabled={editingMetricId !== null}><option value="number">จำนวน (number)</option><option value="text">ข้อความ (text)</option><option value="boolean">ใช่/ไม่ใช่ (boolean)</option></select></label>
+          <label><span class="text-sm font-medium text-slate-700">วิธีรวมผล</span><select class="app-input mt-2" bind:value={metricAggregation} disabled={metricDataType !== 'number'}><option value="sum">ผลรวม (sum)</option><option value="avg">ค่าเฉลี่ย (avg)</option><option value="max">ค่าสูงสุด (max)</option><option value="min">ค่าต่ำสุด (min)</option><option value="none">ไม่รวมผล (none)</option></select></label>
+          <label><span class="text-sm font-medium text-slate-700">ค่าเริ่มต้น</span><input class="app-input mt-2" type="number" bind:value={metricDefaultValue} disabled={metricDataType !== 'number'} /></label>
+          <label><span class="text-sm font-medium text-slate-700">ค่าต่ำสุด</span><input class="app-input mt-2" type="number" bind:value={metricMinValue} disabled={metricDataType !== 'number'} /></label>
+          <label><span class="text-sm font-medium text-slate-700">ค่าสูงสุด</span><input class="app-input mt-2" type="number" bind:value={metricMaxValue} disabled={metricDataType !== 'number'} placeholder="ไม่จำกัด" /></label>
+        {:else}
+          <fieldset class="rounded-2xl border border-violet-200 bg-violet-50/60 p-4 sm:col-span-2">
+            <legend class="px-1 text-sm font-semibold text-violet-950">สูตรผลรวม (SUM)</legend>
+            <p class="mt-1 text-xs leading-5 text-violet-800">เลือก Input Field ตัวเลขอย่างน้อย 2 รายการ ระบบจะคำนวณจากข้อมูลที่อนุมัติแล้วตาม OU และช่วงเวลาของ Report</p>
+            <div class="mt-3 grid gap-2 sm:grid-cols-2">
+              {#each calculationSourceOptions as source}
+                <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-violet-100 bg-white px-3 py-2.5 text-sm text-slate-700">
+                  <input class="h-4 w-4 accent-violet-600" type="checkbox" checked={metricSourceIds.includes(source.id)} on:change={() => toggleMetricSource(source.id)} />
+                  <span><span class="font-medium text-slate-900">{source.name}</span><span class="ml-1 text-xs text-slate-400">({source.code})</span></span>
+                </label>
+              {/each}
+            </div>
+            {#if calculationSourceOptions.length === 0}<p class="mt-3 text-xs text-rose-700">ยังไม่มี Input Field ชนิด number ที่รวมผลแบบ sum สำหรับสร้างสูตร</p>{/if}
+            <div class="mt-3 rounded-xl bg-violet-100/70 px-3 py-2 text-xs font-semibold text-violet-900">ตัวอย่างผลลัพธ์: {metricName.trim() || 'Calculated Field'} = {formulaPreview || 'เลือก Field ต้นทาง'}</div>
+          </fieldset>
+        {/if}
         <label><span class="text-sm font-medium text-slate-700">ลำดับแสดงผล</span><input class="app-input mt-2" type="number" min="0" step="10" bind:value={metricSortOrder} /></label>
-        <label class="sm:col-span-2"><span class="text-sm font-medium text-slate-700">คำอธิบาย</span><textarea class="app-input mt-2 min-h-20 resize-y rounded-2xl py-3" bind:value={metricDescription}></textarea><span class="mt-1 block text-xs text-slate-500">Input type จะถูกกำหนดจากประเภทข้อมูลอัตโนมัติ: number, text หรือ checkbox</span></label>
-        <label class="flex cursor-pointer items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2"><span><span class="block text-sm font-semibold text-slate-900">บังคับกรอก</span><span class="mt-1 block text-xs text-slate-500">ผู้ส่งข้อมูลต้องกรอกก่อนส่งแบบฟอร์ม</span></span><input class="h-5 w-5 accent-sky-600" type="checkbox" bind:checked={metricRequired} /></label>
+        <label class={metricKind === 'calculated' ? '' : 'sm:col-span-2'}><span class="text-sm font-medium text-slate-700">คำอธิบาย</span><textarea class="app-input mt-2 min-h-20 resize-y rounded-2xl py-3" bind:value={metricDescription}></textarea>{#if metricKind === 'input'}<span class="mt-1 block text-xs text-slate-500">Input type จะถูกกำหนดจากประเภทข้อมูลอัตโนมัติ: number, text หรือ checkbox</span>{/if}</label>
+        {#if metricKind === 'input'}<label class="flex cursor-pointer items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2"><span><span class="block text-sm font-semibold text-slate-900">บังคับกรอก</span><span class="mt-1 block text-xs text-slate-500">ผู้ส่งข้อมูลต้องกรอกก่อนส่งแบบฟอร์ม</span></span><input class="h-5 w-5 accent-sky-600" type="checkbox" bind:checked={metricRequired} /></label>{/if}
       </div>
-      <div class="flex justify-end gap-3 border-t border-slate-100 bg-slate-50/70 p-4 sm:px-5"><button type="button" class="app-button-secondary" disabled={mutationBusy} on:click={() => (metricModalOpen = false)}>ยกเลิก</button><button type="button" class="app-button-primary inline-flex items-center gap-2" disabled={mutationBusy || !metricName.trim() || !metricCode.trim()} on:click={saveMetric}><Save size={16} /> {mutationBusy ? 'กำลังบันทึก...' : 'บันทึก'}</button></div>
+      <div class="flex justify-end gap-3 border-t border-slate-100 bg-slate-50/70 p-4 sm:px-5"><button type="button" class="app-button-secondary" disabled={mutationBusy} on:click={() => (metricModalOpen = false)}>ยกเลิก</button><button type="button" class="app-button-primary inline-flex items-center gap-2" disabled={mutationBusy || !metricName.trim() || !metricCode.trim() || (metricKind === 'calculated' && metricSourceIds.length < 2)} on:click={saveMetric}><Save size={16} /> {mutationBusy ? 'กำลังบันทึก...' : 'บันทึก'}</button></div>
     </div>
   </div>
 {/if}

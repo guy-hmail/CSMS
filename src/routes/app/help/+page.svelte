@@ -1,8 +1,8 @@
 <script lang="ts">
   import {
-    BookOpenCheck, Building2, CheckCircle2, ChevronRight,
-    ClipboardCheck, FilePenLine, FileText, LockKeyhole, Send, ShieldCheck,
-    UserCog, UsersRound
+    BookOpenCheck, Building2, CheckCircle2, ChevronRight, CirclePlus,
+    ClipboardCheck, FilePenLine, FileText, Link2, LockKeyhole, Search, Send,
+    ShieldCheck, UserCog, UserPlus, UsersRound
   } from '@lucide/svelte';
 
   const roles = [
@@ -54,6 +54,21 @@
     { title: 'บันทึกแบบร่างหรือส่งข้อมูล', detail: 'แบบร่างยังแก้ไขได้ ส่วนรายการที่ส่งแล้วจะถูกล็อก', icon: Send },
     { title: 'ตรวจสอบและอนุมัติ', detail: 'Approver ตรวจรายการ หรือระบบอนุมัติอัตโนมัติตามค่า Tenant', icon: CheckCircle2 }
   ];
+
+  const createOuSteps = [
+    { title: 'เลือก OU แม่', detail: 'เข้าเมนู “องค์กร” แล้วคลิก OU ที่ต้องการให้เป็นหน่วยงานแม่ในแถบโครงสร้าง' },
+    { title: 'เปิดแบบฟอร์ม', detail: 'กด “สร้าง OU ใหม่” ด้านขวาบน ปุ่มจะแสดงเมื่อคุณมีสิทธิ์จัดการ OU ที่เลือก' },
+    { title: 'กรอกข้อมูล OU', detail: 'ตรวจ OU แม่ ระบุชื่อภาษาไทยหรือภาษาอังกฤษ เลือกประเภท และกำหนดว่าจะรับข้อมูลรายสัปดาห์โดยตรงหรือไม่' },
+    { title: 'สร้างและตรวจสอบ', detail: 'กด “สร้าง OU” แล้วตรวจว่า OU ใหม่ปรากฏใต้หน่วยงานแม่ใน Tree ตามตำแหน่งที่ต้องการ' }
+  ];
+
+  const assignSteps = [
+    { title: 'เลือก OU ปลายทาง', detail: 'เลือก OU จาก Tree แล้วเปิดแท็บ “LINE Accounts & Roles”' },
+    { title: 'กด Assign Existing', detail: 'ใช้กรณีที่ผู้ใช้เคยเข้า CSMS ด้วย LINE และมีบัญชีอยู่ใน Tenant นี้แล้ว' },
+    { title: 'ค้นหาและเลือกบัญชี', detail: 'ค้นหาด้วยชื่อ, LINE User ID หรืออีเมล แล้วเลือก LINE Account ที่ต้องการ' },
+    { title: 'เลือก Role', detail: 'เลือกสิทธิ์ตามหน้าที่ หากเป็น Approver และผู้มอบเป็น Admin จึงจะเปิด “Can Override” ได้' },
+    { title: 'ยืนยัน Assignment', detail: 'กด “Assign Account” ตรวจชื่อและ Role ในรายการสมาชิก จากนั้นให้ผู้ใช้ refresh หรือเข้าใหม่' }
+  ];
 </script>
 
 <svelte:head><title>คู่มือใช้งาน | CSMS</title></svelte:head>
@@ -67,12 +82,90 @@
     </div>
   </section>
 
-  <nav class="app-card grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="หัวข้อคู่มือ">
+  <nav class="app-card grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="หัวข้อคู่มือ">
+    <a class="app-focus flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-sky-50 hover:text-sky-800" href="#create-ou"><span class="flex items-center gap-2"><CirclePlus size={17} /> สร้าง OU</span><ChevronRight size={16} /></a>
+    <a class="app-focus flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-sky-50 hover:text-sky-800" href="#assign-line"><span class="flex items-center gap-2"><UserPlus size={17} /> Assign LINE User</span><ChevronRight size={16} /></a>
     <a class="app-focus flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-sky-50 hover:text-sky-800" href="#weekly-submission"><span class="flex items-center gap-2"><ClipboardCheck size={17} /> ส่งข้อมูล</span><ChevronRight size={16} /></a>
     <a class="app-focus flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-sky-50 hover:text-sky-800" href="#edit-request"><span class="flex items-center gap-2"><LockKeyhole size={17} /> ขอแก้ไข</span><ChevronRight size={16} /></a>
     <a class="app-focus flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-sky-50 hover:text-sky-800" href="#roles"><span class="flex items-center gap-2"><ShieldCheck size={17} /> Role และสิทธิ์</span><ChevronRight size={16} /></a>
     <a class="app-focus flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-sky-50 hover:text-sky-800" href="#ou-scope"><span class="flex items-center gap-2"><UsersRound size={17} /> OU Scope</span><ChevronRight size={16} /></a>
   </nav>
+
+  <section id="create-ou" class="app-card scroll-mt-20 overflow-hidden" aria-labelledby="create-ou-guide-title">
+    <div class="border-b border-sky-100 bg-gradient-to-r from-sky-50 to-emerald-50 p-4 sm:p-6">
+      <div class="flex items-start gap-3"><span class="rounded-2xl bg-white p-2.5 text-sky-700 shadow-sm"><CirclePlus size={21} /></span><div><h2 id="create-ou-guide-title" class="app-section-title">การสร้าง OU ใหม่</h2><p class="app-section-copy">สำหรับ Admin หรือ Manager ที่มีสิทธิ์จัดการ OU แม่และ Subtree นั้น</p></div></div>
+    </div>
+    <div class="grid gap-6 p-4 sm:p-6 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.9fr)]">
+      <div>
+        <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900"><strong>เตรียมก่อนสร้าง:</strong> ตรวจสอบ OU แม่, ชื่อ OU, ประเภท OU และกำหนดการรับข้อมูลให้ถูกต้อง</div>
+        <ol class="mt-5 space-y-4">
+          {#each createOuSteps as step, index}
+            <li class="flex gap-3"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-700 text-xs font-bold text-white">{index + 1}</span><div><h3 class="text-sm font-semibold text-slate-950">{step.title}</h3><p class="mt-1 text-xs leading-5 text-slate-500">{step.detail}</p></div></li>
+          {/each}
+        </ol>
+        <div class="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-600"><strong class="text-slate-900">เลือก “รับข้อมูลรายสัปดาห์” เมื่อ:</strong> OU นี้มีผู้รับผิดชอบกรอกตัวเลขของตัวเอง หากไม่เลือก OU จะใช้สำหรับจัดกลุ่มและสรุปข้อมูลจาก OU ลูกเป็นหลัก เมื่อสร้าง OU ลูกที่รับข้อมูล ระบบจะปิดการรับข้อมูลของ OU แม่ให้อัตโนมัติและแจ้งผู้สร้าง เพื่อป้องกันการนับข้อมูลซ้ำ</div>
+      </div>
+
+      <figure class="overflow-hidden rounded-3xl border border-slate-200 bg-slate-100 shadow-sm">
+        <figcaption class="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-4 py-3 text-xs text-white"><span class="font-semibold">ตัวอย่างหน้าจอ · สร้าง OU ใหม่</span><span class="rounded-full bg-emerald-400/20 px-2 py-1 text-emerald-200">ข้อมูลตัวอย่าง</span></figcaption>
+        <div class="p-3 sm:p-5">
+          <div class="rounded-2xl bg-white p-4 shadow-lg sm:p-5">
+            <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-700"><CirclePlus size={20} /></span><div><p class="font-semibold text-slate-950">สร้าง OU ใหม่</p><p class="text-xs text-slate-500">OU ใหม่จะอยู่ภายใต้หน่วยงานแม่ที่เลือก</p></div></div>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+              <div class="sm:col-span-2"><p class="text-xs font-medium text-slate-600">OU แม่</p><div class="mt-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm text-sky-900">ภาคกลาง › เขต 2</div></div>
+              <div><p class="text-xs font-medium text-slate-600">ชื่อ OU</p><div class="mt-1.5 rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800">กลุ่มสามัคคี</div></div>
+              <div><p class="text-xs font-medium text-slate-600">ประเภท</p><div class="mt-1.5 rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800">กลุ่ม (GROUP)</div></div>
+              <div class="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5"><span class="flex h-5 w-5 items-center justify-center rounded bg-emerald-600 text-white"><CheckCircle2 size={14} /></span><span class="text-xs font-medium text-emerald-900">รับข้อมูลรายสัปดาห์</span></div>
+            </div>
+            <div class="mt-4 flex justify-end gap-2"><span class="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-500">ยกเลิก</span><span class="rounded-full bg-sky-700 px-4 py-2 text-xs font-semibold text-white">สร้าง OU</span></div>
+          </div>
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <section id="assign-line" class="app-card scroll-mt-20 overflow-hidden" aria-labelledby="assign-line-title">
+    <div class="border-b border-emerald-100 bg-emerald-50/70 p-4 sm:p-6"><div class="flex items-start gap-3"><span class="rounded-2xl bg-white p-2.5 text-emerald-700 shadow-sm"><UserPlus size={21} /></span><div><h2 id="assign-line-title" class="app-section-title">การ Assign สิทธิ์ให้ LINE User</h2><p class="app-section-copy">เลือกวิธีตามสถานะของบัญชี: มีบัญชีใน Tenant แล้ว หรือยังไม่เคยเข้าระบบ</p></div></div></div>
+    <div class="p-4 sm:p-6">
+      <div class="grid gap-4 lg:grid-cols-2">
+        <article class="rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 p-4"><div class="flex items-center gap-3"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-700 text-white"><Search size={17} /></span><div><h3 class="text-sm font-semibold text-emerald-950">มี LINE Account ใน Tenant แล้ว</h3><p class="text-xs text-emerald-800">ใช้ปุ่ม “Assign Existing”</p></div></div><p class="mt-3 text-xs leading-5 text-emerald-900">เหมาะกับผู้ใช้ที่เคย Login หรือรับ Invite มาก่อน ระบบค้นหาแล้วเพิ่ม Role ใหม่ใน OU นี้ได้ทันที โดย Assignment เดิมใน OU อื่นยังอยู่</p></article>
+        <article class="rounded-2xl border border-sky-200 bg-sky-50/50 p-4"><div class="flex items-center gap-3"><span class="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-700 text-white"><Link2 size={17} /></span><div><h3 class="text-sm font-semibold text-sky-950">ยังไม่มี LINE Account ใน Tenant</h3><p class="text-xs text-sky-800">ใช้ปุ่ม “สร้าง Invite Link”</p></div></div><p class="mt-3 text-xs leading-5 text-sky-900">กำหนด Role และวันหมดอายุ แล้วส่งลิงก์ทาง LINE ผู้รับต้องเปิดลิงก์และยืนยัน LINE Login ก่อน Assignment จึงมีผล</p></article>
+      </div>
+
+      <div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.9fr)]">
+        <div>
+          <h3 class="text-sm font-semibold text-slate-950">ขั้นตอน Assign Existing Account</h3>
+          <ol class="mt-4 space-y-4">
+            {#each assignSteps as step, index}
+              <li class="flex gap-3"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-xs font-bold text-white">{index + 1}</span><div><h4 class="text-sm font-semibold text-slate-950">{step.title}</h4><p class="mt-1 text-xs leading-5 text-slate-500">{step.detail}</p></div></li>
+            {/each}
+          </ol>
+        </div>
+
+        <figure class="overflow-hidden rounded-3xl border border-slate-200 bg-slate-100 shadow-sm">
+          <figcaption class="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-4 py-3 text-xs text-white"><span class="font-semibold">ตัวอย่างหน้าจอ · Assign LINE Account</span><span class="rounded-full bg-emerald-400/20 px-2 py-1 text-emerald-200">ข้อมูลตัวอย่าง</span></figcaption>
+          <div class="p-3 sm:p-5">
+            <div class="rounded-2xl bg-white p-4 shadow-lg sm:p-5">
+              <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700"><UserPlus size={20} /></span><div><p class="font-semibold text-slate-950">Assign LINE Account</p><p class="text-xs text-slate-500">กำหนดสิทธิ์ใน “กลุ่มสามัคคี”</p></div></div>
+              <div class="mt-4 space-y-3">
+                <div><p class="text-xs font-medium text-slate-600">ค้นหา LINE Account</p><div class="mt-1.5 flex gap-2"><div class="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700">สมชาย</div><span class="rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-600">ค้นหา</span></div></div>
+                <div><p class="text-xs font-medium text-slate-600">LINE Account</p><div class="mt-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5"><p class="text-sm font-semibold text-sky-950">สมชาย ใจดี</p><p class="text-[0.68rem] text-sky-700">LINE U8f••••••••91</p></div></div>
+                <div><p class="text-xs font-medium text-slate-600">Role</p><div class="mt-1.5 rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800">ผู้กรอกข้อมูล (data_entry)</div></div>
+                <div class="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs leading-5 text-sky-900"><strong>ขอบเขต:</strong> Data Entry กรอกได้เฉพาะ OU ที่ Assign โดยตรง หากต้องกรอกหลาย OU ต้องเพิ่ม Assignment แยกแต่ละ OU</div>
+              </div>
+              <div class="mt-4 flex justify-end gap-2"><span class="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-500">ยกเลิก</span><span class="rounded-full bg-emerald-700 px-4 py-2 text-xs font-semibold text-white">Assign Account</span></div>
+            </div>
+          </div>
+        </figure>
+      </div>
+
+      <div class="mt-6 grid gap-3 sm:grid-cols-3">
+        <div class="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-xs leading-5 text-violet-900"><strong class="block text-sm">Admin</strong>มอบได้ทุก Role ภายในขอบเขต และเปิด Override ให้ Approver ได้</div>
+        <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-xs leading-5 text-sky-900"><strong class="block text-sm">Manager</strong>มอบ Manager, Data Entry, Approver และ Viewer ได้ แต่ให้ Admin หรือ Override ไม่ได้</div>
+        <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900"><strong class="block text-sm">ตรวจหลัง Assign</strong>ชื่อผู้ใช้และ Role ต้องปรากฏในรายการ และผู้ใช้ต้องอยู่ใน Tenant เดียวกัน</div>
+      </div>
+    </div>
+  </section>
 
   <section id="weekly-submission" class="app-card scroll-mt-20 p-4 sm:p-6" aria-labelledby="weekly-title">
     <div class="flex items-start gap-3"><span class="rounded-2xl bg-emerald-50 p-2.5 text-emerald-700"><ClipboardCheck size={21} /></span><div><h2 id="weekly-title" class="app-section-title">การส่งข้อมูลรายสัปดาห์</h2><p class="app-section-copy">ขั้นตอนตั้งแต่เลือก OU จนถึงการอนุมัติ</p></div></div>
