@@ -5,6 +5,7 @@
   export let items: KpiSummary[];
   export let selectedMetricCode = '';
   export let onSelectMetric: (metricCode: string) => void = () => {};
+  export let reportHrefForMetric: (metricCode: string) => string = () => '/app/reports';
 </script>
 
 <section aria-labelledby="kpi-summary-title" class="space-y-3">
@@ -15,7 +16,7 @@
 
   <div class="grid gap-3 sm:grid-cols-2 lg:gap-4 xl:grid-cols-4">
     {#each items as item}
-      <KpiSummaryCard {item} selected={item.metricCode === selectedMetricCode} onSelect={() => onSelectMetric(item.metricCode)} />
+      <KpiSummaryCard {item} selected={item.metricCode === selectedMetricCode} onSelect={() => onSelectMetric(item.metricCode)} reportHref={reportHrefForMetric(item.metricCode)} />
     {/each}
   </div>
 </section>

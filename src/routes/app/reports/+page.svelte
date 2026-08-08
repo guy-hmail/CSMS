@@ -31,6 +31,7 @@
   let mounted = false;
   let lastTenantId = '';
   let requestVersion = 0;
+  let focusTrendAfterLoad = false;
 
   const thaiDate = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Bangkok' });
   const thaiMonth = new Intl.DateTimeFormat('th-TH', { month: 'long', year: 'numeric', timeZone: 'Asia/Bangkok' });
@@ -76,6 +77,21 @@
     }));
   }
 
+  function requestedPeriodId(params: URLSearchParams): string {
+    const requested = params.get('period')?.trim() ?? '';
+    if (!requested) return periodOptions[0]?.id ?? '';
+    if (periodOptions.some((period) => period.id === requested)) return requested;
+    if (reportType === 'monthly') {
+      const sourceWeek = weeklyPeriods.find((period) => period.id === requested);
+      if (sourceWeek) {
+        const date = asDate(sourceWeek.toDate);
+        const monthId = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        if (periodOptions.some((period) => period.id === monthId)) return monthId;
+      }
+    }
+    return periodOptions[0]?.id ?? '';
+  }
+
   async function loadContext(): Promise<void> {
     if (!isSupabaseConfigured()) return;
     loading = true;
@@ -93,10 +109,18 @@
         fromDate: period.period_start,
         toDate: period.period_end
       }));
+      const params = new URLSearchParams(window.location.search);
+      const requestedType = params.get('type');
+      reportType = requestedType === 'monthly' || requestedType === 'yearly' ? requestedType : 'weekly';
+      await tick();
       const preferredOuId = $tenantContext.preferences?.defaultOuId ?? '';
-      selectedOuId = organizationUnits.some((ou) => ou.id === preferredOuId) ? preferredOuId : organizationUnits[0]?.id ?? '';
-      selectedPeriodId = weeklyPeriods[0]?.id ?? '';
-      selectedMetricCode = '';
+      const requestedOuId = params.get('ou')?.trim() ?? '';
+      selectedOuId = organizationUnits.some((ou) => ou.id === requestedOuId)
+        ? requestedOuId
+        : organizationUnits.some((ou) => ou.id === preferredOuId) ? preferredOuId : organizationUnits[0]?.id ?? '';
+      selectedPeriodId = requestedPeriodId(params);
+      selectedMetricCode = params.get('metric')?.trim() ?? '';
+      focusTrendAfterLoad = params.get('focus') === 'trend';
       await tick();
       if (selectedOuId && selectedPeriodId) await loadReport();
     } catch (error) {
@@ -133,6 +157,11 @@
       report = null; trend = null; completeness = null;
       errorMessage = error instanceof Error ? error.message : 'ไม่สามารถสร้างรายงานได้';
     } finally { if (version === requestVersion) loading = false; }
+    if (version === requestVersion && focusTrendAfterLoad && report) {
+      focusTrendAfterLoad = false;
+      await tick();
+      document.getElementById('report-trend')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   async function changeReportType(next: ReportType): Promise<void> {
@@ -224,7 +253,7 @@
     </section>
 
     <section class="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(18rem,0.5fr)]">
-      <article class="app-card p-4 sm:p-5" aria-labelledby="trend-title"><div class="flex items-start justify-between gap-3"><div><h2 id="trend-title" class="app-section-title">แนวโน้ม {trend?.metricName}</h2><p class="app-section-copy">ข้อมูลจริงตามช่วงเวลาที่เลือก</p></div><TrendingUp class="text-sky-700" size={20} /></div>
+      <article id="report-trend" class="app-card scroll-mt-20 p-4 sm:p-5" aria-labelledby="trend-title"><div class="flex items-start justify-between gap-3"><div><h2 id="trend-title" class="app-section-title">แนวโน้ม {trend?.metricName}</h2><p class="app-section-copy">ข้อมูลจริงตามช่วงเวลาที่เลือก</p></div><TrendingUp class="text-sky-700" size={20} /></div>
         {#if trend?.points.length}<div class="mt-5 flex h-56 items-end gap-2 rounded-2xl border border-slate-100 bg-sky-50/50 px-3 pb-4 pt-7 sm:gap-4">{#each trend.points as point}<div class="group flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-2"><span class="text-xs font-semibold text-slate-600">{point.value.toLocaleString()}</span><div class="w-full max-w-14 rounded-t-xl bg-gradient-to-t from-sky-700 to-cyan-300" style={`height: ${Math.max(8, (point.value / chartMax) * 145)}px`}></div><span class="text-[0.65rem] text-slate-500">{formatDate(point.periodEnd)}</span></div>{/each}</div>{:else}<p class="py-16 text-center text-sm text-slate-500">ไม่มีข้อมูล trend ในช่วงนี้</p>{/if}
       </article>
       <aside class="app-card p-4 sm:p-5"><h2 class="app-section-title">Submission completeness</h2><div class="mt-5 h-3 overflow-hidden rounded-full bg-slate-100"><div class="h-full rounded-full bg-gradient-to-r from-sky-500 to-emerald-500" style={`width: ${completionPercent}%`}></div></div><div class="mt-5 space-y-3 text-sm"><div class="flex justify-between rounded-xl bg-emerald-50 p-3"><span>อนุมัติแล้ว</span><strong>{completeness?.summary.approved ?? 0}</strong></div><div class="flex justify-between rounded-xl bg-sky-50 p-3"><span>รอตรวจ / แบบร่าง / ส่งกลับ</span><strong>{(completeness?.summary.pending ?? 0) + (completeness?.summary.draft ?? 0) + (completeness?.summary.returned ?? 0)}</strong></div><div class="flex justify-between rounded-xl bg-amber-50 p-3"><span>ยังไม่ส่ง</span><strong>{completeness?.summary.missing ?? 0}</strong></div></div></aside>

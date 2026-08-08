@@ -37,6 +37,12 @@
   let selectedTenantId = '';
   let liffClient: Liff | undefined;
   let inviteToken = '';
+  let nextPath = '';
+
+  function extractSafeNextPath(search: string): string {
+    const candidate = new URLSearchParams(search).get('next')?.trim() ?? '';
+    return candidate.startsWith('/app/') && !candidate.startsWith('//') ? candidate : '';
+  }
 
   function readableError(error: unknown): string {
     const message = error instanceof Error ? error.message : 'เกิดข้อผิดพลาดระหว่างเข้าสู่ระบบ';
@@ -50,6 +56,10 @@
   async function preferredLandingPage(): Promise<string> {
     try { return (await getMyPreferences(getSupabaseBrowserClient())).landingPage; }
     catch { return '/app/dashboard'; }
+  }
+
+  async function authenticatedLandingPage(): Promise<string> {
+    return nextPath || preferredLandingPage();
   }
 
   async function finishLineAuthentication(): Promise<void> {
@@ -67,7 +77,7 @@
       tenantOptions = result.tenants;
 
       if (result.activeTenantId) {
-        await goto(await preferredLandingPage());
+        await goto(await authenticatedLandingPage());
         return;
       }
       if (tenantOptions.length > 1 || result.requiresTenantSelection) {
@@ -106,7 +116,7 @@
     errorMessage = '';
     try {
       await switchLineTenant(getSupabaseBrowserClient(), selectedTenantId);
-      await goto(await preferredLandingPage());
+      await goto(await authenticatedLandingPage());
     } catch (error) {
       errorMessage = readableError(error);
       state = 'error';
@@ -115,6 +125,7 @@
 
   async function initializeLogin(): Promise<void> {
     try {
+      nextPath = extractSafeNextPath(window.location.search);
       inviteToken = extractInviteToken(window.location.search);
       const client = getSupabaseBrowserClient();
       const { data: sessionData } = await client.auth.getSession();
@@ -127,7 +138,7 @@
         const memberships = await listMyTenants(client);
         const current = memberships.find((tenant) => tenant.is_current);
         if (current) {
-          await goto(await preferredLandingPage());
+          await goto(await authenticatedLandingPage());
           return;
         }
         if (memberships.length > 1) {
@@ -147,6 +158,7 @@
       }
 
       liffClient = await initializeLiff();
+      nextPath = extractSafeNextPath(window.location.search) || nextPath;
       if (liffClient.isLoggedIn()) {
         await finishLineAuthentication();
       } else {
@@ -287,9 +299,6 @@
         <p class="text-[0.68rem] leading-5 text-slate-400">
           การเข้าสู่ระบบจะใช้ LINE ID token เพื่อยืนยันตัวตนกับ Backend เท่านั้น
         </p>
-        <a class="mt-2 inline-block text-xs font-medium text-sky-700 hover:underline" href="/super-admin/tenants">
-          เข้าสู่ระบบสำหรับ System Admin
-        </a>
       </div>
     </div>
   </section>

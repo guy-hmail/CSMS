@@ -1,6 +1,17 @@
 # Production setup
 
-This repository is prepared for a Vercel frontend and a hosted Supabase backend. Do not use the local `.env`, local certificates, or `supabase/seed.sql` in production.
+Status: **Production Live since 8 August 2026**
+
+This repository is deployed with a Vercel frontend and a hosted Supabase backend. The instructions below are retained as the setup and repeatable release runbook. Do not use the local `.env`, local certificates, or `supabase/seed.sql` in production.
+
+## Current production record
+
+- Go-Live: confirmed 8 August 2026
+- Frontend platform: Vercel
+- Backend platform: Hosted Supabase
+- Production URL: not recorded in the repository
+- Release identifier: not recorded in the repository
+- Post-deployment smoke-test evidence: not yet recorded in the repository
 
 ## 1. Source control and CI
 

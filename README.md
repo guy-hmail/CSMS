@@ -2,6 +2,8 @@
 
 > A hierarchical Church Attendance & Statistics Management System built with **SvelteKit + Supabase + LINE LIFF**, designed for multi-level church organizations with approval workflow, reporting, dashboards, and role-based access control.
 
+**Production status:** Live since 8 August 2026. The current production baseline includes LINE authentication, multi-tenant organization management, weekly submissions, approval workflow, dashboards, reports/export, user settings, and super-admin tenant management. Remaining backlog items are tracked in `doc/11_backlog.md`.
+
 ---
 
 # Overview
@@ -163,7 +165,7 @@ Parent Organization Units can view:
 
 # Project Phases
 
-## Phase 1 — MVP
+## Phase 1 — MVP ✅ Production
 
 Goal:
 
@@ -178,13 +180,11 @@ Features
 * Reports
 * Excel Export
 
-Approval workflow is **not enabled**.
-
-Submitted records are treated as Approved automatically.
+Tenants can use `auto_approve`, where submitted records are approved automatically.
 
 ---
 
-## Phase 2 — Approval Workflow
+## Phase 2 — Approval Workflow ✅ Production
 
 Additional Features
 
@@ -197,7 +197,7 @@ Additional Features
 
 ---
 
-## Phase 3 — Notification & Workflow
+## Phase 3 — Notification & Workflow 🟡 Partial / Planned
 
 Additional Features
 
@@ -209,7 +209,7 @@ Additional Features
 
 ---
 
-## Phase 4 — Analytics
+## Phase 4 — Analytics 🟡 Partial / Planned
 
 Additional Features
 

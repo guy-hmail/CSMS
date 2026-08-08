@@ -189,8 +189,8 @@
 {/if}
 
 {#if editRequestOpen && currentSubmission}
-  <div class="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 sm:items-center sm:p-4" role="presentation">
-    <div class="w-full max-w-lg rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl" role="dialog" aria-modal="true" aria-labelledby="edit-request-title">
+  <div class="fixed inset-0 z-50 flex min-h-[100dvh] items-end justify-center overflow-y-auto overscroll-contain bg-slate-950/50 p-0 sm:items-center sm:p-4" role="presentation">
+    <div class="max-h-[calc(100vh-0.5rem)] max-h-[calc(100dvh-0.5rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-3xl bg-white p-5 shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-3xl" style="padding-bottom: max(1.25rem, env(safe-area-inset-bottom));" role="dialog" aria-modal="true" aria-labelledby="edit-request-title">
       <h2 id="edit-request-title" class="text-lg font-semibold text-slate-950">ร้องขอแก้ไขข้อมูล</h2>
       <p class="mt-2 text-sm leading-6 text-slate-600">แบบฟอร์มจะยังถูกล็อกจนกว่า Manager หรือ Admin จะอนุมัติคำขอ</p>
       <label class="mt-5 block text-sm font-medium text-slate-700" for="edit-request-reason">เหตุผลที่ต้องการแก้ไข *</label>

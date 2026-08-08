@@ -24,10 +24,12 @@
   let backendStatus: 'connecting' | 'awaiting-auth' | 'live' | 'error' = 'connecting';
   let backendError = '';
   let dashboardLoading = false;
+  let trendLoading = false;
   let summaryEmpty = false;
   let mounted = false;
   let lastTenantId = '';
   let requestVersion = 0;
+  let trendRequestVersion = 0;
 
   type ReportingPeriodRow = { period_id: string; period_start: string; period_end: string; display_label: string };
   const thaiDateFormatter = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Bangkok' });
@@ -86,22 +88,38 @@
   }
 
   async function selectMetric(metricCode: string): Promise<void> {
+    const version = ++trendRequestVersion;
     selectedMetricCode = metricCode;
     selectedMetricName = kpiSummaries.find((item) => item.metricCode === metricCode)?.metricName ?? '';
-    dashboardLoading = true;
+    trendLoading = true;
     try {
       const trend = await getDashboardTrend(getSupabaseBrowserClient(), selectedOuId, metricCode, selectedPeriodId, 12);
+      if (version !== trendRequestVersion) return;
       trendPoints = trend.points.map((point) => ({ label: shortDate(point.periodEnd), value: point.value }));
       selectedMetricName = trend.metricName;
     } catch (error) {
+      if (version !== trendRequestVersion) return;
       backendError = error instanceof Error ? error.message : 'ไม่สามารถโหลดแนวโน้มได้';
-    } finally { dashboardLoading = false; }
+    } finally {
+      if (version === trendRequestVersion) trendLoading = false;
+    }
   }
 
   function selectChildOu(ouId: string): void {
     selectedOuId = ouId;
     void loadSelectedDashboard();
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function monthlyReportHref(metricCode: string): string {
+    const params = new URLSearchParams({
+      type: 'monthly',
+      ou: selectedOuId,
+      period: selectedPeriodId,
+      metric: metricCode,
+      focus: 'trend'
+    });
+    return `/app/reports?${params.toString()}`;
   }
 
   async function loadLiveDashboard(): Promise<void> {
@@ -159,9 +177,9 @@
     <section class="app-card px-5 py-14 text-center"><h2 class="text-base font-semibold text-slate-900">Tenant นี้ยังไม่มีรอบรายงาน</h2></section>
   {:else if periods.length > 0}
     {#if summaryEmpty}<section class="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">ยังไม่มีสถิติที่อนุมัติแล้วสำหรับหน่วยงานและสัปดาห์นี้ สถานะการส่งข้อมูลยังแสดงด้านล่าง</section>{/if}
-    <KpiSummaryGrid items={kpiSummaries} {selectedMetricCode} onSelectMetric={(code) => void selectMetric(code)} />
+    <KpiSummaryGrid items={kpiSummaries} {selectedMetricCode} onSelectMetric={(code) => void selectMetric(code)} reportHrefForMetric={monthlyReportHref} />
     <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_23rem]">
-      <TrendChartPlaceholder points={trendPoints} metricName={selectedMetricName || 'ตัวชี้วัด'} />
+      <TrendChartPlaceholder points={trendPoints} metricName={selectedMetricName || 'ตัวชี้วัด'} metrics={kpiSummaries} {selectedMetricCode} loading={trendLoading} onMetricChange={(code) => void selectMetric(code)} />
       <SubmissionStatusPanel summary={submissionSummary} />
     </div>
     <ChildOuSummaryTable rows={childOuRows} onSelectOu={selectChildOu} />

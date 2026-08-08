@@ -14,6 +14,7 @@
     MapPin,
     Pencil,
     Search,
+    Send,
     ShieldCheck,
     Trash2,
     UserPlus,
@@ -155,6 +156,8 @@
   let inviteLink = '';
   let inviteExpiresAt = '';
   let inviteCreating = false;
+  let inviteSharing = false;
+  let isInLineClient = false;
 
   $: authorizedOus = getAuthorizedOus(ous, authorizedRootIds);
   $: selectedOu = authorizedOus.find((ou) => ou.id === selectedOuId) ?? authorizedOus[0];
@@ -567,6 +570,24 @@
     showToast('คัดลอก Invite Link แล้ว ส่งให้ผู้รับทาง LINE ได้เลย');
   }
 
+  function shareInviteToLineFriend(): void {
+    if (!inviteLink || !selectedOu) return;
+    formError = '';
+    const liffId = env.PUBLIC_LINE_LIFF_ID;
+    if (!liffId) {
+      formError = 'ยังไม่ได้ตั้งค่า LINE LIFF ID';
+      return;
+    }
+    const roleLabel = roleOptions.find((role) => role.id === inviteRole)?.label ?? inviteRole;
+    const shareUrl = new URL(`https://liff.line.me/${liffId}/line/share-invite`);
+    shareUrl.searchParams.set('invite', inviteLink);
+    shareUrl.searchParams.set('ou', selectedOu.name);
+    shareUrl.searchParams.set('role', roleLabel);
+    if (inviteDisplayName.trim()) shareUrl.searchParams.set('recipient', inviteDisplayName.trim());
+    inviteSharing = true;
+    window.location.assign(shareUrl.toString());
+  }
+
   function invitationStatusLabel(status: OuInvitation['status']): string {
     return {
       pending: 'รอรับสิทธิ์',
@@ -647,6 +668,7 @@
   }
 
   onMount(() => {
+    isInLineClient = /\bLine\//i.test(navigator.userAgent);
     void loadOrganization();
   });
 
@@ -970,7 +992,10 @@
             <textarea class="app-input mt-2 min-h-24 resize-none text-xs" readonly value={inviteLink}></textarea>
           </label>
           <p class="flex items-center gap-2 text-xs text-slate-500"><CalendarDays size={15} /> หมดอายุ {new Intl.DateTimeFormat('th-TH', { dateStyle: 'long', timeStyle: 'short' }).format(new Date(inviteExpiresAt))}</p>
-          <button type="button" class="app-button-primary app-focus inline-flex w-full items-center justify-center gap-2" on:click={copyInviteLink}><Copy size={17} /> Copy Link เพื่อส่งทาง LINE</button>
+          {#if isInLineClient}
+            <button type="button" class="app-button-primary app-focus inline-flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60" disabled={inviteSharing} on:click={shareInviteToLineFriend}><Send size={17} /> {inviteSharing ? 'กำลังเปิดรายชื่อเพื่อน...' : 'เลือกเพื่อนใน LINE'}</button>
+          {/if}
+          <button type="button" class="app-button-secondary app-focus inline-flex w-full items-center justify-center gap-2" on:click={copyInviteLink}><Copy size={17} /> Copy Invite Link</button>
         </div>
       {:else}
         <div class="mt-5 space-y-4">

@@ -1,5 +1,9 @@
 # CSMS Full-Loop Integration Test Plan
 
+Production status: ✅ Go-Live completed on 8 August 2026
+
+The automated and UI/UAT results recorded in this document are the latest pre-go-live validation results from 1 August 2026. Production smoke-test evidence and subsequent regression runs must be appended separately rather than replacing this historical result.
+
 อัปเดตล่าสุด: 1 สิงหาคม 2026  
 ขอบเขต: Task 1–8, backend/RLS, frontend integration และ UI desktop/mobile
 

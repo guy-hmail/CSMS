@@ -2,10 +2,12 @@
 
 # Frontend & Backend Product Backlog
 
-อัปเดตล่าสุด: 1 สิงหาคม 2026
+อัปเดตล่าสุด: 8 สิงหาคม 2026
 
 Version: 1.1  
 Status: Active Product Backlog
+
+Production Status: ✅ Go-Live แล้วเมื่อ 8 สิงหาคม 2026
 
 เอกสารนี้รวม backlog เดิม (`BE-*`, `FE-*`, `RP-*`) เข้ากับ Task งานตามหน้า UI ปัจจุบัน โดยสถานะด้านล่างอ้างอิงจากโค้ด, migrations และ tests ที่มีอยู่จริงใน repository
 
@@ -27,6 +29,9 @@ Status: Active Product Backlog
 | 6 | Reports (`/app/reports`) | ✅ ผ่าน Definition of Done |
 | 7 | User Settings (`/app/settings`) | ✅ ผ่าน Definition of Done |
 | 8 | Super Admin (`/super-admin/tenants`) | ✅ ผ่าน Definition of Done |
+| Production | Vercel + Hosted Supabase | ✅ Go-Live แล้ว |
+
+การ Go-Live หมายถึง production baseline ถูกนำขึ้นใช้งานแล้ว งาน Task 1 ที่ยังเหลือและรายการ Technical Debt ด้านล่างเป็นงานปรับปรุงหลัง Go-Live ไม่ใช่ตัวบล็อกสถานะ deployment ปัจจุบัน
 
 ## Mapping กับ Backlog เดิม
 
@@ -441,6 +446,8 @@ Status: Active Product Backlog
 ## ลำดับงานถัดไปที่แนะนำ
 
 1. กลับมาปิด Task 1 ส่วน Reporting Periods และ Metric delete/deactivate
+2. บันทึกผล production smoke test, monitoring และ backup/restore evidence
+3. จัดรอบ regression test หลังการเปลี่ยนแปลง production ทุกครั้ง
 
 ## Definition of Done สำหรับทุก Task
 
@@ -466,7 +473,7 @@ Status: Active Product Backlog
 - Predictive Analytics และ Forecast
 - Integration APIs
 
-## Technical Debt และ Production Readiness
+## Technical Debt และ Post-Go-Live Operations
 
 - Optimize recursive queries และพิจารณา materialized views เมื่อข้อมูลโตขึ้น
 - เพิ่ม caching layer ตามผล performance test
@@ -479,6 +486,7 @@ Status: Active Product Backlog
 
 ## Release Strategy
 
+- Current Production Baseline — ✅ Live: Authentication, Organization, Weekly Submission, Approval, Dashboard, Reports/Export, Settings, Super Admin และ Audit
 - Version 1.0 — MVP: Authentication, Organization, Weekly Submission, Dashboard, Reports และ Audit
 - Version 1.1 — Approval Workflow และ Notification
 - Version 1.2 — Reporting/Export enhancements

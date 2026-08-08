@@ -183,8 +183,8 @@
         <p class="mt-2 max-w-xl text-sm leading-6 text-slate-600 sm:text-[0.95rem]">จัดการข้อมูลส่วนตัว การแจ้งเตือน และค่าใช้งานของ OU ภายในขอบเขตที่คุณรับผิดชอบ</p>
       </div>
       <div class="grid gap-2 sm:grid-cols-2 lg:min-w-[23rem]">
-        <div class="rounded-2xl border border-sky-200 bg-sky-50/90 p-3.5"><p class="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-sky-700">Tenant ปัจจุบัน</p><p class="mt-1.5 truncate text-sm font-semibold text-sky-950">{$tenantContext.activeTenant?.name ?? '—'}</p></div>
-        <div class="rounded-2xl border border-emerald-200 bg-emerald-50/90 p-3.5"><p class="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-emerald-700">บทบาทและขอบเขต</p><p class="mt-1.5 truncate text-sm font-semibold text-emerald-950">{accessLabel}</p></div>
+        <div class="rounded-2xl border border-sky-200 bg-sky-50/90 p-3.5"><p class="settings-context-label-sky text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-sky-700">Tenant ปัจจุบัน</p><p class="settings-context-value-sky mt-1.5 truncate text-sm font-semibold text-sky-950">{$tenantContext.activeTenant?.name ?? '—'}</p></div>
+        <div class="rounded-2xl border border-emerald-200 bg-emerald-50/90 p-3.5"><p class="settings-context-label-emerald text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-emerald-700">บทบาทและขอบเขต</p><p class="settings-context-value-emerald mt-1.5 truncate text-sm font-semibold text-emerald-950">{accessLabel}</p></div>
       </div>
     </div>
   </section>

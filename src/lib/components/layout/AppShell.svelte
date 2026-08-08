@@ -58,7 +58,10 @@
     window.addEventListener('edit-request-count-changed', refreshEditRequestCount);
     void initializeTenantContext().catch((error) => {
       if (error instanceof Error && error.message.includes('AUTH_REQUIRED')) {
-        void goto('/');
+        const returnTo = window.location.pathname.startsWith('/app/')
+          ? `${window.location.pathname}${window.location.search}`
+          : '/app/dashboard';
+        void goto(`/?next=${encodeURIComponent(returnTo)}`);
       }
     });
     return () => window.removeEventListener('edit-request-count-changed', refreshEditRequestCount);
@@ -96,7 +99,7 @@
       <AppSidebar items={navItems} collapsed={sidebarCollapsed} />
     </aside>
 
-    <main class="min-w-0 flex-1 rounded-[1.4rem] border border-white/70 bg-white/60 px-3 py-4 pb-24 shadow-[0_16px_45px_rgba(15,23,42,0.05)] backdrop-blur sm:px-4 md:px-6 md:py-6 md:pb-8 lg:px-8">
+    <main class="min-w-0 flex-1 rounded-[1.4rem] border border-white/70 bg-white/80 px-3 py-4 pb-24 shadow-[0_16px_45px_rgba(15,23,42,0.05)] sm:px-4 md:px-6 md:py-6 md:pb-8 lg:px-8">
       <slot />
     </main>
   </div>

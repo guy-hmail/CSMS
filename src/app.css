@@ -252,6 +252,22 @@ html[data-mode='dark'] .theme-toggle__thumb {
   transform: translateX(1rem);
 }
 
+html[data-mode='dark'] .settings-context-label-sky {
+  color: #7dd3fc !important;
+}
+
+html[data-mode='dark'] .settings-context-value-sky {
+  color: #f0f9ff !important;
+}
+
+html[data-mode='dark'] .settings-context-label-emerald {
+  color: #6ee7b7 !important;
+}
+
+html[data-mode='dark'] .settings-context-value-emerald {
+  color: #ecfdf5 !important;
+}
+
 /* Theme bridge for existing utility-based screens. */
 html[data-mode='dark'] [class~='bg-white'],
 html[data-mode='dark'] [class~='bg-white/95'],

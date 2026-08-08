@@ -3,13 +3,19 @@
 # 08_Deployment.md
 
 Version: 1.0\
-Status: Production Blueprint
+Status: Production Live / Operational Runbook
+
+Last updated: 8 August 2026
+
+Go-Live: ✅ Production deployment completed on 8 August 2026
 
 ## 1. Purpose
 
 This document defines the deployment architecture, environments, CI/CD
 strategy, security hardening, monitoring, backup, disaster recovery, and
 production deployment process for CSMS.
+
+The initial production deployment is complete. This document now also serves as the operational runbook for subsequent releases, rollback, monitoring, backup, and disaster recovery.
 
 ## 2. Deployment Philosophy
 
@@ -133,14 +139,22 @@ Future:
 
 ## 14. Production Checklist
 
-Before deployment:
+Deployment record:
+
+-   [x] Production release promoted and Go-Live confirmed on 8 August 2026
+-   [ ] Record the production URL and release identifier in the repository
+-   [ ] Attach post-deployment smoke-test evidence
+-   [ ] Record monitoring and alert ownership
+-   [ ] Record the latest successful backup/restore drill
+
+Before each deployment:
 
 -   Tests passed
 -   Migration reviewed
 -   RLS verified
 -   API verified
 
-After deployment:
+After each deployment:
 
 -   Login works
 -   Dashboard works

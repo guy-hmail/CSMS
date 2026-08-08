@@ -1,39 +1,38 @@
 <script lang="ts">
-  import { ArrowDownRight, ArrowRight, ArrowUpRight } from '@lucide/svelte';
+  import { ArrowDown, ArrowRight, ArrowUp, Minus } from '@lucide/svelte';
   import type { KpiSummary } from '$lib/types/dashboard';
 
   export let item: KpiSummary;
   export let selected = false;
   export let onSelect: () => void = () => {};
+  export let reportHref = '/app/reports';
 
   $: growthLabel = item.growthPercent === null ? 'N/A vs previous week' : `${item.growthPercent > 0 ? '+' : ''}${item.growthPercent.toFixed(1)}% vs previous week`;
   $: trendTone = item.growthPercent === null ? 'text-slate-500' : item.growthPercent > 0 ? 'text-emerald-700' : item.growthPercent < 0 ? 'text-rose-700' : 'text-slate-600';
-  $: badgeTone = item.growthPercent === null ? 'border-slate-200 bg-slate-50' : item.growthPercent > 0 ? 'border-emerald-200 bg-emerald-50' : item.growthPercent < 0 ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-slate-50';
 </script>
 
-<button type="button" class={`app-card group relative w-full overflow-hidden p-4 text-left transition duration-200 hover:-translate-y-1 hover:border-sky-200 hover:shadow-[0_16px_35px_rgba(14,116,144,0.13)] sm:p-5 ${selected ? 'ring-2 ring-sky-500 ring-offset-2' : ''}`} aria-pressed={selected} on:click={onSelect}>
+<article class={`app-card group relative w-full overflow-hidden p-3 text-left transition duration-200 hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-[0_12px_28px_rgba(14,116,144,0.12)] sm:p-4 ${selected ? 'ring-2 ring-sky-500 ring-offset-2' : ''}`}>
   <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sky-500 via-cyan-400 to-emerald-400"></div>
   <div class="flex items-start justify-between gap-3">
-    <div class="min-w-0">
+    <button type="button" class="min-w-0 flex-1 text-left" aria-pressed={selected} on:click={onSelect}>
       <p class="truncate text-sm font-medium text-slate-600">{item.metricName}</p>
-      <p class="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-[2rem]">{item.value.toLocaleString()}</p>
-      <p class="mt-1 text-sm text-slate-500">{item.unit}</p>
-    </div>
+      <p class="mt-2 flex items-baseline gap-1.5 text-2xl font-semibold tracking-tight text-slate-950 sm:text-[1.75rem]">
+        <span>{item.value.toLocaleString()}</span><span class="text-xs font-medium text-slate-500">{item.unit}</span>
+      </p>
+      <p class={`mt-2 flex items-center gap-1 text-xs font-medium ${trendTone}`}>
+        {#if item.growthPercent === null || item.growthPercent === 0}
+          <Minus size={13} />
+        {:else if item.growthPercent > 0}
+          <ArrowUp size={13} />
+        {:else}
+          <ArrowDown size={13} />
+        {/if}
+        {growthLabel}
+      </p>
+    </button>
 
-    <div class={`mt-1 rounded-2xl border p-2.5 ${badgeTone} ${trendTone}`} aria-hidden="true">
-      {#if item.growthPercent === null}
-        <ArrowRight size={20} />
-      {:else if item.growthPercent > 0}
-        <ArrowUpRight size={20} />
-      {:else if item.growthPercent < 0}
-        <ArrowDownRight size={20} />
-      {:else}
-        <ArrowRight size={20} />
-      {/if}
-    </div>
+    <a href={reportHref} class="app-focus mt-1 rounded-xl border border-sky-200 bg-sky-50 p-2 text-sky-700 transition hover:scale-105 hover:bg-sky-100" aria-label={`ดูกราฟรายเดือน ${item.metricName} ในรายงาน`} title="ดูกราฟรายเดือนใน Reports">
+      <ArrowRight size={18} />
+    </a>
   </div>
-
-  <div class="mt-4">
-    <p class={`text-sm font-medium ${trendTone}`}>{growthLabel}</p>
-  </div>
-</button>
+</article>
