@@ -9,9 +9,11 @@ This repository is deployed with a Vercel frontend and a hosted Supabase backend
 - Go-Live: confirmed 8 August 2026
 - Frontend platform: Vercel
 - Backend platform: Hosted Supabase
-- Production URL: not recorded in the repository
+- Production URL: `https://csms-rouge.vercel.app/`
 - Release identifier: not recorded in the repository
 - Post-deployment smoke-test evidence: not yet recorded in the repository
+
+For every subsequent release, follow `doc/17_Production_Release_and_Rollback_Plan.md`. The release must have a verified backup/PITR checkpoint and a recorded last-known-good Vercel deployment before production migration begins.
 
 ## 1. Source control and CI
 
@@ -71,3 +73,4 @@ Vercel automatically sets `VERCEL=1`, which enables the Vercel adapter. Local Wi
 - CI database tests pass against a clean local Supabase instance.
 - LINE login, invite acceptance, tenant switching, submission, approval, edit request, dashboard, and export pass on Preview.
 - Backup and restore ownership is documented.
+- The release record and rollback decision matrix in `doc/17_Production_Release_and_Rollback_Plan.md` are completed.

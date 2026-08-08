@@ -147,6 +147,8 @@ Deployment record:
 -   [ ] Record monitoring and alert ownership
 -   [ ] Record the latest successful backup/restore drill
 
+The repeatable release sequence, rollback decision matrix, Vercel Instant Rollback procedure, and production-safe Supabase recovery policy are maintained in `17_Production_Release_and_Rollback_Plan.md`.
+
 Before each deployment:
 
 -   Tests passed
