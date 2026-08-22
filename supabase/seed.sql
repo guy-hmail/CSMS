@@ -74,6 +74,78 @@ set user_id = excluded.user_id,
     identity_data = excluded.identity_data,
     updated_at = now();
 
+-- Local Auth identity for the Demo Church LINE tenant administrator imported
+-- from users_rows.csv. The email is local-only and exists so LINE auth can
+-- issue the magic-link session exchange for the pre-linked auth user.
+insert into auth.users (
+    instance_id,
+    id,
+    aud,
+    role,
+    email,
+    encrypted_password,
+    email_confirmed_at,
+    confirmation_token,
+    recovery_token,
+    email_change_token_new,
+    email_change,
+    raw_app_meta_data,
+    raw_user_meta_data,
+    created_at,
+    updated_at
+)
+values (
+    '00000000-0000-0000-0000-000000000000',
+    'b5985c41-e895-469b-8d7e-361be6f267e2',
+    'authenticated',
+    'authenticated',
+    'line-demo-admin@csms.local',
+    '',
+    now(),
+    '',
+    '',
+    '',
+    '',
+    '{"provider":"email","providers":["email"],"auth_provider":"line","active_church_id":"81000000-0000-4000-8000-000000000001"}'::jsonb,
+    '{"email_verified":true,"auth_provider":"line"}'::jsonb,
+    now(),
+    now()
+)
+on conflict (id) do update
+set email = excluded.email,
+    email_confirmed_at = excluded.email_confirmed_at,
+    confirmation_token = excluded.confirmation_token,
+    recovery_token = excluded.recovery_token,
+    email_change_token_new = excluded.email_change_token_new,
+    email_change = excluded.email_change,
+    raw_app_meta_data = excluded.raw_app_meta_data,
+    raw_user_meta_data = excluded.raw_user_meta_data,
+    updated_at = now(),
+    deleted_at = null;
+
+insert into auth.identities (
+    id,
+    provider_id,
+    user_id,
+    identity_data,
+    provider,
+    created_at,
+    updated_at
+)
+values (
+    'b5985c41-e895-469b-8d7e-361be6f267e2',
+    'b5985c41-e895-469b-8d7e-361be6f267e2',
+    'b5985c41-e895-469b-8d7e-361be6f267e2',
+    '{"sub":"b5985c41-e895-469b-8d7e-361be6f267e2","email":"line-demo-admin@csms.local","email_verified":true,"phone_verified":false}'::jsonb,
+    'email',
+    now(),
+    now()
+)
+on conflict (provider_id, provider) do update
+set user_id = excluded.user_id,
+    identity_data = excluded.identity_data,
+    updated_at = now();
+
 insert into public.users (
     id, auth_user_id, line_user_id, display_name, global_role, is_active
 )
@@ -92,7 +164,8 @@ set display_name = excluded.display_name,
     deleted_at = null;
 
 insert into public.churches (
-    id, code, slug, name, description, status, approval_mode, is_active
+    id, code, slug, name, description, status, approval_mode, is_active,
+    reporting_week_ends_on, submission_deadline_days_after_period_end
 )
 values (
     '81000000-0000-4000-8000-000000000001',
@@ -102,12 +175,39 @@ values (
     'ข้อมูลตัวอย่างสำหรับ local development',
     'active',
     'auto_approve',
-    true
+    true,
+    0, -- Sunday (PostgreSQL DOW)
+    1  -- submission deadline is one day after period end
 )
 on conflict (id) do update
 set name = excluded.name,
     description = excluded.description,
     status = 'active',
+    is_active = true,
+    reporting_week_ends_on = excluded.reporting_week_ends_on,
+    submission_deadline_days_after_period_end = excluded.submission_deadline_days_after_period_end,
+    deleted_at = null;
+
+insert into public.users (
+    id, auth_user_id, last_active_church_id, line_user_id, display_name,
+    picture_url, global_role, is_active
+)
+values (
+    '54c9f932-8b50-4845-87e8-d949ff99c7b5',
+    'b5985c41-e895-469b-8d7e-361be6f267e2',
+    '81000000-0000-4000-8000-000000000001',
+    'U3a58a17bfa7d286fba62bd02c81a9311',
+    'Guyus',
+    'https://profile.line-scdn.net/0h62HQk-lCaR11KH-KQiAWSkltZ3ACBm9VDR12fAMvMCQMHX0YTRp0KVguMSRQSCtISR4lK1AqNSRY',
+    'user',
+    true
+)
+on conflict (auth_user_id) do update
+set last_active_church_id = excluded.last_active_church_id,
+    line_user_id = excluded.line_user_id,
+    display_name = excluded.display_name,
+    picture_url = excluded.picture_url,
+    global_role = 'user',
     is_active = true,
     deleted_at = null;
 
@@ -122,6 +222,20 @@ values (
     '82000000-0000-4000-8000-000000000001',
     '81000000-0000-4000-8000-000000000001',
     '80000000-0000-4000-8000-000000000001',
+    'active',
+    now(),
+    '80000000-0000-4000-8000-000000000001'
+)
+on conflict (church_id, user_id) do update
+set status = 'active';
+
+insert into public.church_members (
+    id, church_id, user_id, status, joined_at, created_by
+)
+values (
+    '82000000-0000-4000-8000-000000000002',
+    '81000000-0000-4000-8000-000000000001',
+    '54c9f932-8b50-4845-87e8-d949ff99c7b5',
     'active',
     now(),
     '80000000-0000-4000-8000-000000000001'
@@ -169,6 +283,21 @@ values (
     '81000000-0000-4000-8000-000000000001',
     '84000000-0000-4000-8000-000000000001',
     '82000000-0000-4000-8000-000000000001',
+    'admin',
+    true,
+    '80000000-0000-4000-8000-000000000001'
+)
+on conflict (church_id, ou_id, church_member_id, permission) do update
+set is_active = true, deleted_at = null;
+
+insert into public.ou_members (
+    id, church_id, ou_id, church_member_id, permission, is_active, assigned_by
+)
+values (
+    '85000000-0000-4000-8000-000000000002',
+    '81000000-0000-4000-8000-000000000001',
+    '84000000-0000-4000-8000-000000000001',
+    '82000000-0000-4000-8000-000000000002',
     'admin',
     true,
     '80000000-0000-4000-8000-000000000001'

@@ -570,6 +570,12 @@ Submission forms must be generated from `statistic_metrics`.
 Open submission page
   │
   ▼
+Load canonical calculation periods and snapshotted submission windows
+  │
+  ▼
+Select the latest server-provided default period and show open/due state
+  │
+  ▼
 Load active metrics
   │
   ▼
@@ -584,6 +590,10 @@ Validate required/min/max/data type
   ▼
 Submit values to submit_statistics RPC
 ```
+
+The frontend must not calculate Sunday or any other period boundary itself. It consumes `periodStart`, `periodEnd`, `submissionOpensAt`, `submissionDueAt`, `submissionState`, and `defaultPeriodId` from `get_weekly_submission_context`. Forms and normal submit/save actions are disabled for `not_open`, `overdue`, and `locked`. A `returned` correction remains editable because the backend authorization workflow explicitly reopened that submission. Missing-reminder deep links preselect the server-provided `periodId` and `ouId` only when they remain accessible.
+
+Dashboard and Reports use `ensure_recent_reporting_periods`. Labels display the dynamic weekday/date from `periodEnd` and show the submission deadline separately; aggregation filters continue to use calculation dates.
 
 ## 14.2 Metric Input Mapping
 

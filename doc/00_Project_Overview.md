@@ -40,7 +40,7 @@ Current challenges include:
 * Manual data collection through Excel or chat applications
 * Difficult report consolidation
 * Duplicate data
-* Late submissions
+* Tenant-configured submission deadlines with authorized returned-correction handling
 * No audit trail
 * Difficult historical comparison
 * No centralized dashboard

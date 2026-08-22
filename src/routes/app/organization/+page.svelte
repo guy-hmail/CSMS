@@ -185,11 +185,34 @@
     return allOus.filter((ou) => {
       let parentId = ou.parentId;
       while (parentId) {
+        const parent = allOus.find((item) => item.id === parentId);
+        if (!parent) break;
         if (!expanded.has(parentId)) return false;
-        parentId = allOus.find((item) => item.id === parentId)?.parentId ?? null;
+        parentId = parent.parentId;
       }
       return true;
     });
+  }
+
+  function getExpandedIdsForSelection(
+    allOus: OrganizationUnit[],
+    currentExpandedIds: Set<string>,
+    selectedId: string
+  ): Set<string> {
+    const ouIds = new Set(allOus.map((ou) => ou.id));
+    const next = new Set([...currentExpandedIds].filter((id) => ouIds.has(id)));
+
+    for (const ou of allOus) {
+      if (!ou.parentId || !ouIds.has(ou.parentId)) next.add(ou.id);
+    }
+
+    let parentId = allOus.find((ou) => ou.id === selectedId)?.parentId ?? null;
+    while (parentId && ouIds.has(parentId)) {
+      next.add(parentId);
+      parentId = allOus.find((ou) => ou.id === parentId)?.parentId ?? null;
+    }
+
+    return next;
   }
 
   function getAccount(accountId: string): LineAccount {
@@ -379,7 +402,6 @@
         allowDataEntry: newOuAllowDataEntry
       });
       await loadOrganization(created.ouId);
-      expandedIds = new Set([...expandedIds, parent.id]);
       createModalOpen = false;
       showToast(created.parentDataEntryDisabled
         ? `สร้าง ${name} แล้ว และปิดการรับข้อมูลของ OU แม่ “${created.parentOuName}” อัตโนมัติ เพื่อป้องกันการนับข้อมูลซ้ำ`
@@ -514,7 +536,7 @@
         : liveOus.some((item) => item.id === selectedOuId)
           ? selectedOuId
           : liveOus[0].id;
-      expandedIds = new Set(liveOus.filter((item) => item.parentId === null).map((item) => item.id));
+      expandedIds = getExpandedIdsForSelection(liveOus, expandedIds, selectedOuId);
       await loadMembers(selectedOuId);
     } catch (error) {
       organizationError = error instanceof Error ? error.message : 'ไม่สามารถโหลดโครงสร้างองค์กรได้';

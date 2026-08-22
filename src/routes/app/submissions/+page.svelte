@@ -33,7 +33,9 @@
   let editRequestReason = '';
   let requestingEdit = false;
 
-  $: locked = currentSubmission !== null && !['draft', 'returned'].includes(currentSubmission.submission.status);
+  $: selectedPeriod = periods.find((period) => period.id === selectedPeriodId);
+  $: windowLocked = selectedPeriod?.submissionState !== 'open' && currentSubmission?.submission.status !== 'returned';
+  $: locked = windowLocked || (currentSubmission !== null && !['draft', 'returned'].includes(currentSubmission.submission.status));
   $: if (mounted && selectedOuId && selectedPeriodId && `${selectedOuId}:${selectedPeriodId}` !== contextKey) {
     contextKey = `${selectedOuId}:${selectedPeriodId}`;
     void loadSubmission();
@@ -45,18 +47,44 @@
   function formatDate(value: string): string {
     return new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${value}T00:00:00`));
   }
+  function formatDateTime(value: string): string {
+    return new Intl.DateTimeFormat('th-TH', {
+      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    }).format(new Date(value));
+  }
+  function submissionWindowLabel(): string {
+    if (!selectedPeriod) return '';
+    if (selectedPeriod.submissionState === 'not_open') return `ยังไม่เปิดรับรายงาน · เปิด ${selectedPeriod.submissionOpensAt ? formatDateTime(selectedPeriod.submissionOpensAt) : 'ตามกำหนด'}`;
+    if (selectedPeriod.submissionState === 'overdue') return `เลยกำหนดส่งแล้ว · กำหนดส่ง ${selectedPeriod.submissionDueAt ? formatDateTime(selectedPeriod.submissionDueAt) : 'ตามกำหนด'}`;
+    if (selectedPeriod.submissionState === 'locked') return 'รอบนี้ถูกปิดรับรายงานแล้ว';
+    return `เปิดรับรายงาน · ส่งภายใน ${selectedPeriod.submissionDueAt ? formatDateTime(selectedPeriod.submissionDueAt) : 'กำหนดเวลา'}`;
+  }
   async function loadContext(): Promise<void> {
     pageLoading = true;
     pageError = '';
     try {
       const data = await getWeeklySubmissionContext(getSupabaseBrowserClient());
-      periods = data.periods.map((period) => ({ id: period.id, label: formatDate(period.periodEnd), helperText: `${formatDate(period.periodStart)} – ${formatDate(period.periodEnd)} · สัปดาห์ที่ ${period.weekNo}` }));
+      periods = data.periods.map((period) => ({
+        id: period.id,
+        label: formatDate(period.periodEnd),
+        helperText: `${formatDate(period.periodStart)} – ${formatDate(period.periodEnd)} · สัปดาห์ที่ ${period.weekNo}`,
+        submissionOpensAt: period.submissionOpensAt,
+        submissionDueAt: period.submissionDueAt,
+        submissionState: period.submissionState
+      }));
       organizationUnits = data.organizationUnits.map((ou) => ({ id: ou.id, label: ou.name }));
       metrics = data.metrics;
       metricValues = emptyValues();
-      selectedPeriodId = periods[0]?.id ?? '';
+      const params = new URLSearchParams(window.location.search);
+      const requestedPeriodId = params.get('periodId')?.trim() ?? '';
+      selectedPeriodId = periods.some((period) => period.id === requestedPeriodId)
+        ? requestedPeriodId
+        : periods.some((period) => period.id === data.defaultPeriodId) ? data.defaultPeriodId ?? '' : periods[0]?.id ?? '';
       const preferredOuId = $tenantContext.preferences?.defaultOuId ?? '';
-      selectedOuId = organizationUnits.some((ou) => ou.id === preferredOuId) ? preferredOuId : organizationUnits[0]?.id ?? '';
+      const requestedOuId = params.get('ouId')?.trim() ?? '';
+      selectedOuId = organizationUnits.some((ou) => ou.id === requestedOuId)
+        ? requestedOuId
+        : organizationUnits.some((ou) => ou.id === preferredOuId) ? preferredOuId : organizationUnits[0]?.id ?? '';
       mounted = true;
       if (selectedPeriodId && selectedOuId) {
         contextKey = `${selectedOuId}:${selectedPeriodId}`;
@@ -156,6 +184,8 @@
     const code = error instanceof BackendError ? error.code : error instanceof Error ? error.message : '';
     if (code.includes('PERMISSION_DENIED')) return 'คุณไม่มีสิทธิ์บันทึกข้อมูลของหน่วยงานนี้';
     if (code.includes('PERIOD_LOCKED')) return 'ช่วงเวลานี้ถูกปิดรับข้อมูลแล้ว';
+    if (code.includes('SUBMISSION_WINDOW_NOT_OPEN')) return 'รอบนี้ยังไม่เปิดรับรายงาน';
+    if (code.includes('SUBMISSION_DEADLINE_PASSED')) return 'เลยกำหนดส่งรายงานของรอบนี้แล้ว';
     if (code.includes('SUBMISSION_ALREADY_APPROVED') || code.includes('INVALID_STATUS_TRANSITION')) return 'รายการนี้ถูกล็อกแล้ว หากต้องแก้ไขให้ผู้อนุมัติส่งกลับก่อน';
     return 'ไม่สามารถเชื่อมต่อข้อมูลได้ กรุณาลองอีกครั้ง';
   }
@@ -175,6 +205,7 @@
 {:else}
   <div class="app-page space-y-5">
     <SubmissionContextSelectors {periods} {organizationUnits} bind:selectedPeriodId bind:selectedOuId disabled={detailLoading || mutating} />
+    {#if selectedPeriod}<section class={`rounded-2xl border px-4 py-3 text-sm ${selectedPeriod.submissionState === 'open' ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : selectedPeriod.submissionState === 'overdue' ? 'border-rose-200 bg-rose-50 text-rose-900' : 'border-amber-200 bg-amber-50 text-amber-900'}`}><p class="font-semibold">{submissionWindowLabel()}</p><p class="mt-1 text-xs opacity-80">รอบคำนวณ {selectedPeriod.helperText}</p></section>{/if}
     {#if pageError}<section class="rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800" role="alert">{pageError} <button class="ml-2 underline" type="button" on:click={loadSubmission}>ลองอีกครั้ง</button></section>{/if}
     {#if currentSubmission}
       <section class="app-card flex flex-wrap items-center justify-between gap-3 p-4"><div><p class="text-xs font-semibold uppercase tracking-wide text-slate-500">สถานะ</p><p class="mt-1 font-semibold text-slate-900">{statusLabels[currentSubmission.submission.status]} · รุ่นที่ {currentSubmission.submission.revisionNo}</p></div>{#if currentSubmission.submission.status === 'edit_requested'}<p class="text-sm text-sky-800">ส่งคำขอแล้ว แบบฟอร์มจะปลดล็อกเมื่อ Manager/Admin อนุมัติ</p>{:else if locked}<div class="flex flex-wrap items-center gap-3"><p class="text-sm text-amber-800">รายการถูกล็อก</p>{#if ['submitted', 'approved'].includes(currentSubmission.submission.status)}<button class="app-button-secondary" type="button" on:click={() => (editRequestOpen = true)}>ร้องขอแก้ไข</button>{/if}</div>{/if}</section>

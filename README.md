@@ -62,6 +62,8 @@ The system uses **LINE LIFF** for authentication and **Supabase** as Backend-as-
 ## Attendance Management
 
 * Weekly Attendance Entry
+  * Tenant-configured calculation week boundary
+  * Independent 1–6 day submission deadline with Tenant-timezone enforcement
 * Sunday School Statistics
 * New Visitor Statistics
 * New Believer Statistics

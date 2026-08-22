@@ -216,6 +216,18 @@ Canonical override rule:
 
 # 9. Weekly Workflow
 
+## 9.1 Calculation period and submission window
+
+The weekly calculation boundary and the submission deadline are independent Tenant settings:
+
+- `reporting_week_ends_on` defines the last date included in calculations. A Sunday boundary produces a Monday–Sunday seven-day period.
+- `submission_deadline_days_after_period_end` defines how many local calendar days after `period_end` remain available for normal submission. It must be 1–6.
+- The submission window opens at 00:00 on `period_end` and closes at 23:59:59.999999 on `period_end + submission_deadline_days_after_period_end`, evaluated in the Tenant timezone.
+- Dashboard/report aggregation, ISO week, and month/quarter/year assignment always use `period_end`; a submission deadline must never move business data into another reporting period.
+- Submission, approval, dashboard, report selectors, and missing-submission reminders must use the same server-generated canonical period/window.
+- New drafts and normal submissions are rejected before opening and after the deadline. A specific submission returned through the authorized edit-request workflow may be corrected and resubmitted after the normal deadline while the period remains administratively open.
+- Each period snapshots `submission_opens_at` and `submission_due_at`; later Tenant-setting changes do not rewrite historical deadlines.
+
 ## Tenant mode: `auto_approve` (initial MVP default)
 
 Workflow

@@ -8,8 +8,8 @@
   import { exportCsv, exportExcel, exportPdf, type ExportMetadata, type ExportRow } from '$lib/reports/reportExport';
 
   type ReportType = 'weekly' | 'monthly' | 'yearly';
-  type ReportingPeriod = { period_id: string; period_start: string; period_end: string; display_label: string };
-  type PeriodOption = { id: string; label: string; fromDate: string; toDate: string };
+  type ReportingPeriod = { period_id: string; period_start: string; period_end: string; display_label: string; submission_due_at: string | null };
+  type PeriodOption = { id: string; label: string; fromDate: string; toDate: string; submissionDueAt?: string | null };
   type OuOption = { id: string; code: string; label: string };
 
   let reportType: ReportType = 'weekly';
@@ -100,14 +100,15 @@
       const client = getSupabaseBrowserClient();
       const { data: sessionData } = await client.auth.getSession();
       if (!sessionData.session) { loading = false; return; }
-      const [tree, periodResult] = await Promise.all([getAccessibleOuTree(client), client.rpc('ensure_recent_sunday_periods')]);
+      const [tree, periodResult] = await Promise.all([getAccessibleOuTree(client), client.rpc('ensure_recent_reporting_periods')]);
       if (periodResult.error) throw periodResult.error;
       organizationUnits = flattenOus(tree.items);
       weeklyPeriods = ((periodResult.data ?? []) as ReportingPeriod[]).map((period) => ({
         id: period.period_id,
-        label: `${formatDate(period.period_end)} · ${period.display_label}`,
+        label: `${formatDate(period.period_end)} · รอบคำนวณ ${period.display_label}`,
         fromDate: period.period_start,
-        toDate: period.period_end
+        toDate: period.period_end,
+        submissionDueAt: period.submission_due_at
       }));
       const params = new URLSearchParams(window.location.search);
       const requestedType = params.get('type');
@@ -261,7 +262,7 @@
       <label><span class="text-sm font-medium text-slate-700">{reportType === 'weekly' ? 'สัปดาห์' : reportType === 'monthly' ? 'เดือน' : 'ปี'}</span><select class="app-input mt-1" bind:value={selectedPeriodId} on:change={loadReport}>{#each periodOptions as period}<option value={period.id}>{period.label}</option>{/each}</select></label>
       <label><span class="text-sm font-medium text-slate-700">Metric</span><select class="app-input mt-1" bind:value={selectedMetricCode} on:change={changeMetric}>{#each report?.metrics ?? [] as metric}<option value={metric.metricCode}>{metric.metricName} ({metric.unit})</option>{/each}</select></label>
     </div>
-    {#if report && selectedPeriod}<div class="mt-4 flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-4 text-xs text-slate-500"><span>{report.church.name} · {report.ou.name} · {selectedPeriod.label}</span><span class="inline-flex items-center gap-1.5 font-semibold text-emerald-700"><CheckCircle2 size={14} /> เฉพาะ submission ที่อนุมัติแล้ว · สร้าง {formatGeneratedAt()}</span></div>{/if}
+    {#if report && selectedPeriod}<div class="mt-4 flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-4 text-xs text-slate-500"><span>{report.church.name} · {report.ou.name} · {selectedPeriod.label}{selectedPeriod.submissionDueAt ? ` · กำหนดส่ง ${thaiDateTime.format(new Date(selectedPeriod.submissionDueAt))}` : ''}</span><span class="inline-flex items-center gap-1.5 font-semibold text-emerald-700"><CheckCircle2 size={14} /> เฉพาะ submission ที่อนุมัติแล้ว · สร้าง {formatGeneratedAt()}</span></div>{/if}
   </section>
 
   {#if errorMessage}<section class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert"><AlertTriangle class="mr-2 inline" size={17} />{errorMessage} <button class="ml-2 underline" on:click={loadContext}>ลองอีกครั้ง</button></section>{/if}

@@ -29,6 +29,7 @@
   let adminEmail = '';
   let timezone = 'Asia/Bangkok';
   let weekEndsOn = 'sunday';
+  let submissionDeadlineDaysAfterPeriodEnd = 1;
   let approvalMode: 'auto_approve' | 'approval_required' = 'auto_approve';
   let tenants: Tenant[] = [];
   let authReady = false;
@@ -63,6 +64,7 @@
     adminEmail = '';
     timezone = 'Asia/Bangkok';
     weekEndsOn = 'sunday';
+    submissionDeadlineDaysAfterPeriodEnd = 1;
     approvalMode = 'auto_approve';
     createModalOpen = true;
   }
@@ -126,6 +128,7 @@
         adminEmail: adminEmail.trim(),
         timezone,
         weekEndsOn: weekEndsOn as 'sunday' | 'saturday',
+        submissionDeadlineDaysAfterPeriodEnd,
         approvalMode
       });
       createModalOpen = false;
@@ -309,7 +312,7 @@
       <div class="space-y-6 p-5 sm:p-6">
         <div><p class="flex items-center gap-2 text-sm font-semibold text-slate-900"><Building2 size={17} class="text-violet-700" /> ข้อมูลองค์กร</p><div class="mt-4 grid gap-4 sm:grid-cols-2"><label><span class="text-sm font-medium text-slate-700">ชื่อ Tenant</span><input class="app-input mt-2" bind:value={tenantName} on:blur={deriveSlug} placeholder="เช่น Hope Church" /></label><label><span class="text-sm font-medium text-slate-700">Slug</span><input class="app-input mt-2" bind:value={tenantSlug} placeholder="hope-church" /></label><label class="sm:col-span-2"><span class="text-sm font-medium text-slate-700">ชื่อ Root OU Level 1</span><input class="app-input mt-2" bind:value={rootOuName} placeholder="เช่น คริสตจักรหลัก" /></label></div></div>
         <div class="border-t border-slate-100 pt-6"><p class="flex items-center gap-2 text-sm font-semibold text-slate-900"><Users size={17} class="text-sky-700" /> ผู้ดูแล Tenant คนแรก</p><div class="mt-4 grid gap-4 sm:grid-cols-2"><label><span class="text-sm font-medium text-slate-700">ชื่อผู้ดูแล</span><input class="app-input mt-2" bind:value={adminName} placeholder="Tenant Admin" /></label><label><span class="text-sm font-medium text-slate-700">อีเมลสำหรับคำเชิญ</span><input class="app-input mt-2" type="email" bind:value={adminEmail} placeholder="admin@example.org" /></label></div></div>
-        <div class="border-t border-slate-100 pt-6"><p class="flex items-center gap-2 text-sm font-semibold text-slate-900"><Clock3 size={17} class="text-emerald-700" /> ค่าเริ่มต้น</p><div class="mt-4 grid gap-4 sm:grid-cols-2"><label><span class="text-sm font-medium text-slate-700">Timezone</span><select class="app-input mt-2" bind:value={timezone}><option>Asia/Bangkok</option><option>Asia/Singapore</option><option>UTC</option></select></label><label><span class="text-sm font-medium text-slate-700">วันสิ้นสุดรอบรายงาน</span><select class="app-input mt-2" bind:value={weekEndsOn}><option value="sunday">วันอาทิตย์</option><option value="saturday">วันเสาร์</option></select></label><label class="sm:col-span-2"><span class="text-sm font-medium text-slate-700">โหมดการอนุมัติ</span><select class="app-input mt-2" bind:value={approvalMode}><option value="auto_approve">ส่งแล้วอนุมัติอัตโนมัติ</option><option value="approval_required">ต้องผ่านผู้อนุมัติ</option></select></label></div></div>
+        <div class="border-t border-slate-100 pt-6"><p class="flex items-center gap-2 text-sm font-semibold text-slate-900"><Clock3 size={17} class="text-emerald-700" /> ค่าเริ่มต้น</p><div class="mt-4 grid gap-4 sm:grid-cols-2"><label><span class="text-sm font-medium text-slate-700">Timezone</span><select class="app-input mt-2" bind:value={timezone}><option>Asia/Bangkok</option><option>Asia/Singapore</option><option>UTC</option></select></label><label><span class="text-sm font-medium text-slate-700">วันสิ้นสุดรอบคำนวณ</span><select class="app-input mt-2" bind:value={weekEndsOn}><option value="sunday">วันอาทิตย์</option><option value="saturday">วันเสาร์</option></select></label><label><span class="text-sm font-medium text-slate-700">กำหนดส่งหลังสิ้นสุดรอบ</span><select class="app-input mt-2" bind:value={submissionDeadlineDaysAfterPeriodEnd}><option value={1}>1 วัน</option><option value={2}>2 วัน</option><option value={3}>3 วัน</option><option value={4}>4 วัน</option><option value={5}>5 วัน</option><option value={6}>6 วัน</option></select></label><label><span class="text-sm font-medium text-slate-700">โหมดการอนุมัติ</span><select class="app-input mt-2" bind:value={approvalMode}><option value="auto_approve">ส่งแล้วอนุมัติอัตโนมัติ</option><option value="approval_required">ต้องผ่านผู้อนุมัติ</option></select></label></div></div>
         <div class="rounded-2xl border border-sky-200 bg-sky-50 p-4"><p class="flex items-start gap-2 text-xs leading-5 text-sky-800"><CheckCircle2 class="mt-0.5 shrink-0" size={16} /> หลังสร้าง ระบบจะเตรียม OU Type เริ่มต้นและ Field สถิติมาตรฐาน ผู้ดูแล Tenant สามารถแก้ไขต่อได้จาก Tenant Settings</p></div>
       </div>
       {#if formError}

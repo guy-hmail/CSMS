@@ -44,6 +44,7 @@ export type CreatePlatformTenantInput = {
   adminEmail: string;
   timezone: string;
   weekEndsOn: 'sunday' | 'saturday';
+  submissionDeadlineDaysAfterPeriodEnd: number;
   approvalMode: 'auto_approve' | 'approval_required';
 };
 
@@ -64,6 +65,7 @@ export type PlatformTenantDetail = {
   timezone: string;
   approvalMode: 'auto_approve' | 'approval_required';
   weekEndsOn: 'sunday' | 'saturday';
+  submissionDeadlineDaysAfterPeriodEnd: number;
   status: PlatformTenantStatus;
   trialEndsAt: string | null;
   createdAt: string;
@@ -101,8 +103,45 @@ export type PlatformTenantActivity = {
   createdAt: string;
 };
 
+export type PlatformNotificationOperations = {
+  tenantId: string;
+  windowHours: number;
+  generatedAt: string;
+  summary: {
+    notificationsCreated: number;
+    deliveriesCreated: number;
+    pending: number;
+    processing: number;
+    retryableFailed: number;
+    deadLetter: number;
+    staleProcessing: number;
+    oldestQueuedAt: string | null;
+    sentInWindow: number;
+    deadLetterInWindow: number;
+    successRate: number;
+    failureRate: number;
+    retryableAttempts: number;
+    permanentAttempts: number;
+    staleRecoveries: number;
+  };
+  events: Array<{
+    eventType: string;
+    notificationCount: number;
+    deliveryCount: number;
+  }>;
+  recentDeadLetters: Array<{
+    deliveryId: string;
+    notificationId: string;
+    eventType: string;
+    attemptCount: number;
+    deliveryCycle: number;
+    errorCode: string | null;
+    updatedAt: string;
+  }>;
+};
+
 export type UpdatePlatformTenantInput = Pick<PlatformTenantDetail,
-  'name' | 'slug' | 'description' | 'timezone' | 'approvalMode' | 'weekEndsOn'>;
+  'name' | 'slug' | 'description' | 'timezone' | 'approvalMode' | 'weekEndsOn' | 'submissionDeadlineDaysAfterPeriodEnd'>;
 
 function mapTenant(row: PlatformTenantRow): PlatformTenant {
   return {
@@ -197,5 +236,16 @@ export function createPlatformAdminInviteLink(
   return rawRpc<PlatformAdminInvite>(client, 'create_platform_admin_invite_link', {
     p_tenant_id: tenantId,
     p_expires_in_days: expiresInDays
+  });
+}
+
+export function getPlatformNotificationOperations(
+  client: SupabaseClient,
+  tenantId: string,
+  windowHours = 24
+): Promise<PlatformNotificationOperations> {
+  return rawRpc<PlatformNotificationOperations>(client, 'get_platform_notification_operations', {
+    p_tenant_id: tenantId,
+    p_window_hours: windowHours
   });
 }

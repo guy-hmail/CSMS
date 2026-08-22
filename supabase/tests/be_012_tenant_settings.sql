@@ -111,7 +111,15 @@ select public.update_tenant_settings(jsonb_build_object(
     'timezone', 'Asia/Bangkok',
     'approvalMode', 'approval_required',
     'reportingWeekEndsOn', 6,
+    'submissionDeadlineDaysAfterPeriodEnd', 2,
     'primaryMetricId', '60000000-0000-0000-0000-000000000121'
+));
+
+select public.update_tenant_notification_schedule(jsonb_build_object(
+    'enabled', true,
+    'scheduleDays', jsonb_build_array('MON', 'WED', 'SAT'),
+    'missingReminderLocalHour', 8,
+    'approvalDigestLocalHour', 17
 ));
 
 create temporary table created_ou_types as
@@ -167,6 +175,11 @@ select pg_temp.assert_true(
     (select name = 'Settings Updated'
         and approval_mode = 'approval_required'
         and reporting_week_ends_on = 6
+        and submission_deadline_days_after_period_end = 2
+        and notification_schedule_enabled
+        and notification_schedule_days = array['MON', 'WED', 'SAT']::text[]
+        and missing_reminder_local_hour = 8
+        and approval_digest_local_hour = 17
      from public.churches
      where id = '00000000-0000-0000-0000-000000000121'),
     'direct Root Admin updates tenant settings'
@@ -224,7 +237,7 @@ $$;
 
 reset role;
 select pg_temp.assert_true(
-    (select count(*) = 5
+    (select count(*) = 6
      from public.audit_logs
      where church_id = '00000000-0000-0000-0000-000000000121'),
     'all successful settings mutations are audited'
@@ -242,6 +255,17 @@ begin
     begin
         perform public.update_tenant_settings(jsonb_build_object('name', 'Manager Denied'));
         raise exception 'Root manager mutation was accepted';
+    exception when others then
+        if sqlerrm <> 'DIRECT_ROOT_ADMIN_REQUIRED' then raise; end if;
+    end;
+    begin
+        perform public.update_tenant_notification_schedule(jsonb_build_object(
+            'enabled', true,
+            'scheduleDays', jsonb_build_array('SUN'),
+            'missingReminderLocalHour', 9,
+            'approvalDigestLocalHour', 9
+        ));
+        raise exception 'Root manager notification schedule mutation was accepted';
     exception when others then
         if sqlerrm <> 'DIRECT_ROOT_ADMIN_REQUIRED' then raise; end if;
     end;

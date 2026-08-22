@@ -1,6 +1,6 @@
 # Notifications Phase Plan
 
-Status: Planned
+Status: Code complete — Stages A through F implemented; production execution pending
 
 Target release: Version 1.1
 
@@ -69,28 +69,30 @@ Do not store LINE access tokens, ID tokens, or provider secrets in either table.
 
 | ID | Task | Priority | Output |
 |---|---|---|---|
-| NT-001 | Confirm central OA and Messaging API setup | P0 | OA Basic ID, Channel ID, production policy, quota owner |
-| NT-002 | Add notification schema, indexes, constraints and RLS | P0 | Migration + DB tests |
-| NT-003 | Add notification preference resolver | P0 | One backend function for preference/active-member checks |
-| NT-004 | Add transactional notification enqueue function | P0 | Idempotent `enqueue_notification` RPC/helper |
-| NT-005 | Add read APIs | P0 | list, unread count, mark read, mark all read, archive |
-| NT-006 | Build In-app Notification Center | P1 | Bell badge, list/dropdown, empty/error/loading, deep links |
-| NT-007 | Connect submission and approval events | P0 | Submitted, approved, returned, edit-request events |
-| NT-008 | Connect OU assignment/invitation events | P1 | Access-change notifications |
-| NT-009 | Build `send-line-notification` Edge Function | P0 | Queue claim, LINE Push, status update, sanitized logs |
-| NT-010 | Add retry and dead-letter policy | P0 | Exponential backoff, maximum attempts, manual replay contract |
-| NT-011 | Build `scan-missing-submissions` scheduled job | P1 | Missing-submission reminders with tenant timezone support |
-| NT-012 | Build pending-approval daily digest | P2 | One digest per recipient/day instead of message spam |
-| NT-013 | Add Add-Friend state/CTA | P1 | OA QR/link and delivery-unavailable explanation |
-| NT-014 | Add operations dashboard/query | P1 | Delivery success/failure/queue depth without exposing message bodies unnecessarily |
-| NT-015 | Security and tenant-isolation review | P0 | RLS tests, recipient-scope tests, secret/redaction review |
-| NT-016 | End-to-end and production rollout | P0 | Preview smoke test, canary, rollback/runbook, production evidence |
+| NT-001 | Confirm central OA and Messaging API setup | P0 | ✅ Configuration contract documented; production values/owner confirmation remain a production action |
+| NT-002 | Add notification schema, indexes, constraints and RLS | P0 | ✅ Migration + DB tests |
+| NT-003 | Add notification preference resolver | P0 | ✅ Backend function for preference/active-member/OU-scope checks |
+| NT-004 | Add transactional notification enqueue function | P0 | ✅ Internal idempotent `enqueue_notification` helper |
+| NT-005 | Add read APIs | P0 | ✅ list, unread count, mark read, mark all read, archive |
+| NT-006 | Build In-app Notification Center | P1 | ✅ Bell badge, responsive panel, loading/empty/error/retry, read/archive and safe deep links |
+| NT-007 | Connect submission and approval events | P0 | ✅ Submitted, approved, returned and edit-request events |
+| NT-008 | Connect OU assignment/invitation events | P1 | ✅ Direct assignment and accepted-invitation access notifications |
+| NT-009 | Build `send-line-notification` Edge Function | P0 | ✅ Queue claim, LINE Push, status update, sanitized logs |
+| NT-010 | Add retry and dead-letter policy | P0 | ✅ 30-minute/2-hour bounded retry, maximum attempts, audited manual replay |
+| NT-011 | Build `scan-missing-submissions` scheduled job | P1 | ✅ Missing-submission reminders with Tenant timezone and current-period filtering |
+| NT-012 | Build pending-approval daily digest | P2 | ✅ One actionable digest per recipient/local day instead of message spam |
+| NT-013 | Add Add-Friend state/CTA | P1 | ✅ LIFF friendship state, OA link/CTA and delivery-unavailable explanation |
+| NT-014 | Add operations dashboard/query | P1 | ✅ Tenant queue depth, rates, stale leases, events, and privacy-minimized dead letters |
+| NT-015 | Security and tenant-isolation review | P0 | ✅ RLS/scope/redaction regression and automated client-secret scan |
+| NT-016 | End-to-end and production rollout | P0 | ✅ CI/preflight, canary/rollback runbook and evidence template; hosted execution pending |
 
 ## 6. Implementation Stages
 
 ### Stage A — Foundation
 
 Implement NT-001 through NT-005. In-app records are the source of truth. No external message is sent during this stage.
+
+Implementation status: ✅ Code and documentation complete. Production migration application and environment-owner confirmation are intentionally not performed from the development repository.
 
 Exit criteria:
 
@@ -103,6 +105,8 @@ Exit criteria:
 
 Implement NT-006 and deep links. Badge count must be tenant-aware and refresh after read/archive actions.
 
+Implementation status: ✅ Complete in code and local browser validation. The header panel reloads on active-Tenant change, clears stale feed state, updates the badge after mark-read/all/archive, validates relative deep links again in the frontend, and relies on each destination route to re-authorize access.
+
 Exit criteria:
 
 - Desktop/mobile UI supports unread, read, empty, loading and failure states.
@@ -112,6 +116,8 @@ Exit criteria:
 ### Stage C — Automatic Event Notifications
 
 Implement NT-007 and NT-008. Business RPCs enqueue events; they do not call LINE directly.
+
+Implementation status: ✅ Complete in code and local database validation. Event triggers are gated by transaction-local context set only by trusted business RPC wrappers. Recipient roles and OU ancestry are resolved in the database, optional LINE outbox rows respect preferences, and no provider API is called.
 
 Exit criteria:
 
@@ -129,6 +135,10 @@ Required Supabase Edge Function secrets:
 - `LINE_MESSAGING_CHANNEL_SECRET`
 - Platform production LIFF/Web URL values required to build deep links
 
+Implementation status: ✅ Complete in code and local validation. The service-role-only worker claims with `SKIP LOCKED`, rechecks recipient eligibility at send time, uses the delivery UUID as the stable LINE retry key, and classifies accepted, retryable, and permanent provider responses. Attempts are capped at three across 30-minute and 2-hour delays; expired worker leases are recoverable and dead letters can be manually replayed into a new audited cycle. Delivery is fail-closed behind `LINE_DELIVERY_ENABLED` and an explicit Tenant canary list. The Notification Center shows LIFF friendship state and falls back to the central OA add-friend link.
+
+Production migration, secret configuration, Edge Function deployment, canary enablement, and a real LINE Push were intentionally not performed from this development task.
+
 Exit criteria:
 
 - Edge Function is the only component that reads Messaging API secrets.
@@ -140,15 +150,23 @@ Exit criteria:
 
 Implement NT-011 and NT-012 with Supabase Cron calling protected Edge Functions.
 
+Implementation status: ✅ Complete in code and local validation. Both service-role-only functions are designed for hourly invocation and fail closed behind a separate platform schedule kill switch and explicit Tenant canary list. Each direct Root OU Admin can independently enable schedules, select weekdays, and set separate missing-reminder and approval-digest hours in the Tenant timezone. New/existing Tenants remain disabled until explicitly enabled. Missing reminders inspect only the latest period whose snapshotted `submission_opens_at <= run_at <= submission_due_at` and require it to remain administratively open; they do not fire before opening or after the normal deadline. Reminder text includes the Tenant-local deadline and the deep link preselects period/OU. Daily digests mirror actionable approval scope, including nearest-approver behavior. Deterministic local-date event keys make repeated invocations idempotent.
+
+Production Cron creation, scheduler credentials, canary enablement, and hosted invocation evidence were intentionally not performed from this development task.
+
 Exit criteria:
 
-- Reminder time respects Tenant timezone/reporting schedule.
+- Reminder time respects Tenant timezone, calculation boundary, and snapshotted submission window.
 - One OU/period/reminder window produces one event per recipient.
 - Closed periods, inactive OUs/users and already-submitted OUs are skipped.
 
 ### Stage F — Production Readiness
 
 Implement NT-014 through NT-016.
+
+Implementation status: ✅ Repository work complete and locally validated. System Admin Tenant Detail now exposes aggregate queue health, sent/dead-letter rates, stale processing, event counts, sanitized error classifications, and correlation IDs without recipients or message content. A security regression scans client source and public environment examples for forbidden secret names, while database tests prove System Admin-only, Tenant-scoped operations output. CI and production preflight cover notification config, Edge tests/checks, and security review. The release/rollback runbook and `doc/18_Notifications_Production_Evidence.md` provide the production evidence contract.
+
+Preview/production deployment, real recipient/provider tests, hosted Cron creation, secret rotation drill, and canary promotion remain explicit production-owner actions; the repository does not claim those as executed evidence.
 
 Exit criteria:
 
@@ -160,10 +178,8 @@ Exit criteria:
 ## 7. Retry Policy
 
 - Attempt 1: immediate
-- Attempt 2: after 1 minute
-- Attempt 3: after 5 minutes
-- Attempt 4: after 30 minutes
-- Attempt 5: after 2 hours, then `dead_letter`
+- Attempt 2: after 30 minutes
+- Attempt 3: after 2 hours, then `dead_letter`
 - Do not retry permanent recipient errors such as invalid/unreachable LINE user; retain failure reason and In-app notification
 
 ## 8. Testing Plan

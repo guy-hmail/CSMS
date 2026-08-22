@@ -47,6 +47,17 @@ select pg_temp.assert_true((select jsonb_array_length(response #> '{data,periods
 select pg_temp.assert_true((select response #>> '{data,organizationUnits,0,name}' = 'Visible A' from context_result), 'only submit-capable OU');
 select pg_temp.assert_true((select jsonb_array_length(response #> '{data,metrics}') = 1 from context_result), 'metrics are tenant isolated');
 select pg_temp.assert_true((select (response #>> '{data,metrics,0,maxValue}')::numeric = 10 from context_result), 'metric validation metadata is returned');
+
+-- Keep this regression deterministic after submission-window enforcement. The
+-- generated recent periods are tied to the wall clock and may all be overdue
+-- when the suite runs later in the week.
+reset role;
+update public.statistic_periods
+set submission_opens_at = now() - interval '1 hour',
+    submission_due_at = now() + interval '1 hour'
+where id = ((select response #>> '{data,periods,0,id}' from context_result))::uuid;
+set local role authenticated;
+
 select pg_temp.assert_true(
   public.get_submission_by_context('40000000-0000-0000-0000-000000000161', ((select response #>> '{data,periods,0,id}' from context_result))::uuid) #> '{data}' = 'null'::jsonb,
   'lookup returns null before first draft'

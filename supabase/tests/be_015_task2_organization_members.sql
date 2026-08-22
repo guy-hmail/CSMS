@@ -247,18 +247,19 @@ select public.update_organization_unit(jsonb_build_object(
     'allowDataEntry', false, 'sortOrder', 12
 ));
 select pg_temp.assert_true(
-    (select parent_id = '95000000-0000-4000-8000-000000000006'
-        and level = 4
-        and path = '/root-a/branch/other/95000000-0000-4000-8000-000000000004'
+    (select parent_id = '95000000-0000-4000-8000-000000000002'
+        and level = 3
+        and path = '/root-a/branch/move'
+        and code = 'MOVE'
         and name = 'Move OU Updated'
      from public.organization_units where id = '95000000-0000-4000-8000-000000000004'),
-    'OU metadata and parent move persisted'
+    'OU metadata updates while immutable code and hierarchy remain unchanged'
 );
 select pg_temp.assert_true(
-    (select level = 5
-        and path = '/root-a/branch/other/95000000-0000-4000-8000-000000000004/child'
+    (select level = 4
+        and path = '/root-a/branch/move/child'
      from public.organization_units where id = '95000000-0000-4000-8000-000000000005'),
-    'OU move recalculates descendant path and level'
+    'metadata-only OU update leaves descendant hierarchy unchanged'
 );
 
 select public.soft_delete_organization_unit(jsonb_build_object(

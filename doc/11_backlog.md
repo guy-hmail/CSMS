@@ -289,10 +289,10 @@ Production Status: ✅ Go-Live แล้วเมื่อ 8 สิงหาค�
 ### Backend
 
 - [x] RPC `get_recursive_summary`
-- [x] RPC `ensure_recent_sunday_periods`
+- [x] RPC `ensure_recent_reporting_periods` ใช้วันสิ้นสุดรอบคำนวณตาม Tenant และ snapshot submission deadline (`ensure_recent_sunday_periods` เหลือเป็น compatibility wrapper)
 - [x] Aggregation ตาม OU subtree
 - [x] Compare period และ growth percent
-- [x] Database tests สำหรับ recursive summary และ recent Sundays
+- [x] Database tests สำหรับ recursive summary, Tenant-configured calculation boundary และ submission window/deadline
 - [x] RPC `get_submission_status_summary` สำหรับ completeness/status ของ reporting OU
 - [x] RPC `get_child_ou_summary` สำหรับ direct-child subtree rollup
 - [x] RPC `get_dashboard_trend` หลาย period ในครั้งเดียว
@@ -448,24 +448,25 @@ Production Status: ✅ Go-Live แล้วเมื่อ 8 สิงหาค�
 
 ช่องทาง: In-app Notification Center + CSMS LINE OA กลาง
 
-สถานะรวม: ⬜ Planned
+สถานะรวม: 🟢 Stage A–F เสร็จใน code/local validation; รอ production execution evidence
 
 แผนละเอียด: `doc/15_Notifications_Phase_Plan.md`
 
 ### Scope
 
-- [ ] Notification schema, RLS, indexes และ idempotent event key
-- [ ] Transactional enqueue/outbox สำหรับ business events
-- [ ] Notification list, unread count, mark read/all read และ archive APIs
-- [ ] Notification Center และ badge ที่แยก Tenant ถูกต้อง
-- [ ] Auto event: submitted, approved, returned และ edit request
-- [ ] Auto event: OU assignment/invitation
-- [ ] Supabase Edge Function ส่งผ่าน CSMS LINE OA กลาง
-- [ ] Retry, dead-letter และ provider-error classification
-- [ ] Scheduled missing-submission reminder
-- [ ] Pending-approval daily digest
-- [ ] Add Friend CTA/QR และ In-app fallback
-- [ ] Monitoring, runbook, secret rotation และ production canary
+- [x] Notification schema, RLS, indexes และ idempotent event key (NT-002)
+- [x] Transactional internal enqueue/outbox helper สำหรับ business events (NT-004)
+- [x] Notification list, unread count, mark read/all read และ archive APIs (NT-005)
+- [x] Notification Center และ badge ที่แยก Tenant ถูกต้อง พร้อม loading/empty/error/retry, read/all, archive และ safe deep links (NT-006)
+- [x] Auto event: submitted, approved, returned และ edit request (NT-007)
+- [x] Auto event: OU assignment/invitation (NT-008)
+- [x] Supabase Edge Function ส่งผ่าน CSMS LINE OA กลาง (NT-009)
+- [x] Retry, dead-letter และ provider-error classification พร้อม audited manual replay (NT-010)
+- [x] Scheduled missing-submission reminder ตาม Tenant timezone/current period (NT-011)
+- [x] ให้ Root OU Admin เปิด/ปิด เลือกวัน MON–SUN และตั้งเวลา reminder/digest แยกราย Tenant
+- [x] Pending-approval daily digest ตาม actionable approval scope (NT-012)
+- [x] Add Friend state/CTA/link และ In-app fallback (NT-013)
+- [x] Monitoring, security review, runbook, secret rotation/canary evidence contract (NT-014–NT-016)
 
 ### Architecture Decisions
 
@@ -477,21 +478,21 @@ Production Status: ✅ Go-Live แล้วเมื่อ 8 สิงหาค�
 
 ### Acceptance Criteria
 
-- [ ] Event เดียวกันไม่สร้างหรือส่ง notification ซ้ำ
-- [ ] ผู้ใช้เห็นเฉพาะ notification ของตนใน active Tenant
-- [ ] Recipient selection เคารพ role, OU subtree, active membership และ preferences
-- [ ] LINE ส่งไม่สำเร็จแล้ว In-app notification ยังอยู่
-- [ ] Retry มีขอบเขตและ permanent failure เข้า dead letter
-- [ ] Reminder ข้าม OU ที่ส่งแล้ว, period ปิด, user/OU inactive
-- [ ] Secret/token ไม่ปรากฏใน browser, database payload, audit หรือ logs
-- [ ] มี kill switch ปิด outbound LINE โดยไม่ปิด In-app notification
+- [x] Event replay ไม่สร้าง In-app notification หรือ delivery ซ้ำใน Stage A
+- [x] ผู้ใช้เห็นเฉพาะ notification ของตนใน active Tenant
+- [x] Resolver บังคับ active membership, OU subtree และ preferences พร้อม role-specific recipient selection ใน Stage C
+- [x] LINE ส่งไม่สำเร็จแล้ว In-app notification ยังอยู่
+- [x] Retry มีขอบเขตและ permanent failure เข้า dead letter
+- [x] Reminder ข้าม OU ที่มี submission แล้ว, period ปิด, user/OU inactive และเรียกซ้ำไม่สร้างซ้ำ
+- [x] Secret/token ไม่ปรากฏใน browser, database payload, audit หรือ logs สำหรับ Stage D paths
+- [x] มี kill switch ปิด outbound LINE โดยไม่ปิด In-app notification
 
 ### Definition of Done — Task 9
 
-- [ ] P0 event notifications ทำงานทั้ง In-app และ LINE OA กลาง
-- [ ] Missing-submission scheduled reminder ทำงานและไม่ส่งซ้ำ
-- [ ] Database, Edge Function, integration และ frontend tests ผ่าน
-- [ ] `npm run check`, production build และ database lint ผ่าน
+- [x] P0 event notifications ทำงานใน local integration ทั้ง In-app และ LINE outbox/worker contract
+- [x] Missing-submission scheduled reminder ทำงานและไม่ส่งซ้ำในการทดสอบ local
+- [x] Database, Edge Function, security และ frontend tests ผ่านใน repository
+- [x] `npm run check`, production build และ database lint ผ่าน
 - [ ] Preview/canary test และ production smoke evidence ถูกบันทึก
 - [ ] Monitoring, quota/provider outage, replay และ secret-rotation runbook พร้อมใช้งาน
 
@@ -499,7 +500,7 @@ Production Status: ✅ Go-Live แล้วเมื่อ 8 สิงหาค�
 
 ## ลำดับงานถัดไปที่แนะนำ
 
-1. เริ่ม Task 9 Stage A: Notification schema, RLS, enqueue และ read APIs
+1. ดำเนิน production release ตาม `doc/18_Notifications_Production_Evidence.md` โดยเริ่ม disabled และ single-Tenant canary
 2. กลับมาปิด Task 1 ส่วน Reporting Periods และ Metric delete/deactivate
 3. บันทึกผล production smoke test, monitoring และ backup/restore evidence
 4. จัดรอบ regression test หลังการเปลี่ยนแปลง production ทุกครั้ง

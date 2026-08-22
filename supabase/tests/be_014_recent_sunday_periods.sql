@@ -20,26 +20,29 @@ select set_config(
 );
 
 create temporary table recent_periods as
-select * from public.ensure_recent_sunday_periods();
+select * from public.ensure_recent_reporting_periods();
 
 reset role;
 
 select pg_temp.assert_true(
     (select count(*) = 5 from recent_periods),
-    'returns the upcoming Sunday and four previous Sundays'
+    'returns the latest completed calculation date and four prior periods'
 );
 
 select pg_temp.assert_true(
     (
         select max(period_end)
-            = current_date + ((7 - extract(dow from current_date)::integer) % 7)
+            = (now() at time zone 'Asia/Bangkok')::date
+              - ((extract(dow from (now() at time zone 'Asia/Bangkok')::date)::integer - 0 + 7) % 7)
           and min(period_end)
-            = current_date + ((7 - extract(dow from current_date)::integer) % 7) - 28
+            = (now() at time zone 'Asia/Bangkok')::date
+              - ((extract(dow from (now() at time zone 'Asia/Bangkok')::date)::integer - 0 + 7) % 7) - 28
           and bool_and(period_end - period_start = 6)
+          and bool_and(submission_opens_at is not null and submission_due_at is not null)
         from recent_periods
     ),
-    'reporting window is Monday through Sunday and spans four weeks back'
+    'calculation window is Monday through Sunday and each period snapshots a submission window'
 );
 
-select 'ok 1 - BE-014 rolling Sunday reporting periods';
+select 'ok 1 - BE-014 Tenant-configured reporting periods';
 rollback;

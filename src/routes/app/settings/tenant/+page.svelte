@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { env } from '$env/dynamic/public';
   import {
-    ArrowLeft, BarChart3, BellRing, Building2, Calculator, CheckCircle2, CirclePlus, Copy, ExternalLink, Info, LayoutDashboard, ListTree,
+    ArrowLeft, BarChart3, BellRing, Building2, Calculator, CalendarClock, CheckCircle2, CirclePlus, Copy, ExternalLink, Info, LayoutDashboard, ListTree,
     Link2, LockKeyhole, Pencil, Save, ShieldCheck, SlidersHorizontal, X
   } from '@lucide/svelte';
   import { normalizeLiffId } from '$lib/auth/liffConfig';
@@ -16,7 +16,9 @@
     updateCalculatedMetric,
     updateDashboardMetricSettings,
     updateStatisticMetric,
-    updateTenantSettings
+    updateTenantNotificationSchedule,
+    updateTenantSettings,
+    type NotificationScheduleDay
   } from '$lib/api/tenantSettingsApi';
 
   type Tab = 'general' | 'ou-types' | 'metrics';
@@ -62,8 +64,22 @@
   let tenantName = '';
   let tenantTimezone = 'Asia/Bangkok';
   let tenantWeekEndsOn = '0';
+  let tenantSubmissionDeadlineDays = '1';
   let tenantApprovalMode = 'auto_approve';
   let tenantPrimaryMetricId = '';
+  let notificationScheduleEnabled = false;
+  let notificationScheduleDays: NotificationScheduleDay[] = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+  let missingReminderLocalHour = 9;
+  let approvalDigestLocalHour = 9;
+  const notificationDayOptions: { value: NotificationScheduleDay; label: string }[] = [
+    { value: 'MON', label: 'จันทร์' },
+    { value: 'TUE', label: 'อังคาร' },
+    { value: 'WED', label: 'พุธ' },
+    { value: 'THU', label: 'พฤหัสบดี' },
+    { value: 'FRI', label: 'ศุกร์' },
+    { value: 'SAT', label: 'เสาร์' },
+    { value: 'SUN', label: 'อาทิตย์' }
+  ];
   let toastMessage = '';
   let ouModalOpen = false;
   let metricModalOpen = false;
@@ -117,7 +133,7 @@
       const [tenantResult, ouTypeResult, ouUsageResult, metricResult] = await Promise.all([
         client
           .from('churches')
-          .select('name,timezone,reporting_week_ends_on,approval_mode,primary_metric_id')
+          .select('name,timezone,reporting_week_ends_on,submission_deadline_days_after_period_end,approval_mode,primary_metric_id,notification_schedule_enabled,notification_schedule_days,missing_reminder_local_hour,approval_digest_local_hour')
           .single(),
         client
           .from('organization_unit_types')
@@ -140,8 +156,13 @@
       tenantName = tenantResult.data.name;
       tenantTimezone = tenantResult.data.timezone;
       tenantWeekEndsOn = String(tenantResult.data.reporting_week_ends_on);
+      tenantSubmissionDeadlineDays = String(tenantResult.data.submission_deadline_days_after_period_end);
       tenantApprovalMode = tenantResult.data.approval_mode;
       tenantPrimaryMetricId = tenantResult.data.primary_metric_id ?? '';
+      notificationScheduleEnabled = tenantResult.data.notification_schedule_enabled;
+      notificationScheduleDays = tenantResult.data.notification_schedule_days as NotificationScheduleDay[];
+      missingReminderLocalHour = tenantResult.data.missing_reminder_local_hour;
+      approvalDigestLocalHour = tenantResult.data.approval_digest_local_hour;
 
       const usage = new Map<string, number>();
       for (const organization of ouUsageResult.data ?? []) {
@@ -465,12 +486,44 @@
         timezone: tenantTimezone,
         approvalMode: tenantApprovalMode as 'auto_approve' | 'approval_required',
         reportingWeekEndsOn: Number(tenantWeekEndsOn),
+        submissionDeadlineDaysAfterPeriodEnd: Number(tenantSubmissionDeadlineDays),
         primaryMetricId: tenantPrimaryMetricId || null
       });
       toastMessage = 'อัปเดตค่าทั่วไปของ Tenant แล้ว';
       await loadSettings(false);
     } catch (error) {
       mutationError = error instanceof Error ? error.message : 'บันทึก Tenant Settings ไม่สำเร็จ';
+    } finally {
+      mutationBusy = false;
+    }
+  }
+
+  function toggleNotificationDay(day: NotificationScheduleDay): void {
+    notificationScheduleDays = notificationScheduleDays.includes(day)
+      ? notificationScheduleDays.filter((item) => item !== day)
+      : notificationDayOptions
+          .map((item) => item.value)
+          .filter((item) => item === day || notificationScheduleDays.includes(item));
+  }
+
+  async function saveNotificationSchedule(): Promise<void> {
+    if (notificationScheduleDays.length === 0) {
+      mutationError = 'กรุณาเลือกวันแจ้งเตือนอย่างน้อย 1 วัน';
+      return;
+    }
+    mutationBusy = true;
+    mutationError = '';
+    try {
+      await updateTenantNotificationSchedule(getSupabaseBrowserClient(), {
+        enabled: notificationScheduleEnabled,
+        scheduleDays: notificationScheduleDays,
+        missingReminderLocalHour: Number(missingReminderLocalHour),
+        approvalDigestLocalHour: Number(approvalDigestLocalHour)
+      });
+      toastMessage = 'อัปเดตตารางเวลาแจ้งเตือนแล้ว';
+      await loadSettings(false);
+    } catch (error) {
+      mutationError = error instanceof Error ? error.message : 'บันทึกตารางเวลาแจ้งเตือนไม่สำเร็จ';
     } finally {
       mutationBusy = false;
     }
@@ -531,10 +584,42 @@
         <fieldset disabled={mutationBusy || settingsLoading} class="mt-5 grid gap-4 sm:grid-cols-2">
           <label class="sm:col-span-2"><span class="text-sm font-medium text-slate-700">ชื่อ Tenant</span><input class="app-input mt-2" bind:value={tenantName} /></label>
           <label><span class="text-sm font-medium text-slate-700">Timezone</span><select class="app-input mt-2" bind:value={tenantTimezone}><option>Asia/Bangkok</option><option>Asia/Singapore</option><option>UTC</option></select></label>
-          <label><span class="text-sm font-medium text-slate-700">วันสิ้นสุดรอบรายงาน</span><select class="app-input mt-2" bind:value={tenantWeekEndsOn}><option value="0">วันอาทิตย์</option><option value="6">วันเสาร์</option></select></label>
+          <label><span class="text-sm font-medium text-slate-700">วันสิ้นสุดรอบคำนวณ</span><select class="app-input mt-2" bind:value={tenantWeekEndsOn}><option value="0">วันอาทิตย์</option><option value="6">วันเสาร์</option></select><span class="mt-1 block text-xs text-slate-500">กำหนด period_end และขอบเขตตัวเลขที่ใช้ในรายงาน</span></label>
+          <label><span class="text-sm font-medium text-slate-700">กำหนดส่งหลังสิ้นสุดรอบ</span><select class="app-input mt-2" bind:value={tenantSubmissionDeadlineDays}><option value="1">1 วัน</option><option value="2">2 วัน</option><option value="3">3 วัน</option><option value="4">4 วัน</option><option value="5">5 วัน</option><option value="6">6 วัน</option></select><span class="mt-1 block text-xs text-slate-500">ปิดรับเวลา 23:59 ตาม Timezone ของ Tenant</span></label>
           <label><span class="text-sm font-medium text-slate-700">โหมดอนุมัติ</span><select class="app-input mt-2" bind:value={tenantApprovalMode}><option value="auto_approve">อนุมัติอัตโนมัติ</option><option value="approval_required">ต้องผ่านผู้อนุมัติ</option></select></label>
           <label><span class="text-sm font-medium text-slate-700">Primary KPI</span><select class="app-input mt-2" bind:value={tenantPrimaryMetricId}>{#each metrics.filter((item) => item.active && item.metricKind === 'input' && item.dataType === 'number') as item}<option value={item.id}>{item.name}</option>{/each}</select></label>
         </fieldset>
+        <section class="mt-5 rounded-2xl border border-sky-200 bg-sky-50/50 p-4 sm:p-5" aria-labelledby="notification-schedule-title">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 id="notification-schedule-title" class="flex items-center gap-2 text-sm font-semibold text-sky-950"><CalendarClock size={17} /> Scheduled Notification</h3>
+              <p class="mt-1 text-xs leading-5 text-sky-800">กำหนดวันและเวลาตาม Timezone ของ Tenant ระบบ Cron กลางจะตรวจทุกชั่วโมงและไม่สร้างรายการซ้ำในวันเดียวกัน</p>
+            </div>
+            <label class="inline-flex w-fit items-center gap-2 rounded-full border border-sky-200 bg-white px-3 py-2 text-xs font-semibold text-sky-900">
+              <input type="checkbox" class="h-4 w-4 accent-sky-700" bind:checked={notificationScheduleEnabled} disabled={mutationBusy || settingsLoading} />
+              เปิดใช้งาน
+            </label>
+          </div>
+          <fieldset disabled={mutationBusy || settingsLoading} class="mt-4 space-y-4">
+            <div>
+              <span class="text-sm font-medium text-slate-700">วันแจ้งเตือน</span>
+              <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                {#each notificationDayOptions as day}
+                  <label class={`app-focus flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-semibold transition ${notificationScheduleDays.includes(day.value) ? 'border-sky-300 bg-white text-sky-900 shadow-sm' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+                    <input type="checkbox" class="h-4 w-4 accent-sky-700" checked={notificationScheduleDays.includes(day.value)} on:change={() => toggleNotificationDay(day.value)} />
+                    {day.label}
+                  </label>
+                {/each}
+              </div>
+              <p class="mt-2 text-xs text-slate-500">รหัสวันใช้ MON, TUE, WED, THU, FRI, SAT และ SUN</p>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <label><span class="text-sm font-medium text-slate-700">เวลาเตือนรายงานที่ยังไม่ส่ง</span><select class="app-input mt-2" bind:value={missingReminderLocalHour}>{#each Array.from({ length: 24 }, (_, hour) => hour) as hour}<option value={hour}>{String(hour).padStart(2, '0')}:00</option>{/each}</select></label>
+              <label><span class="text-sm font-medium text-slate-700">เวลาสรุปรายงานรออนุมัติ</span><select class="app-input mt-2" bind:value={approvalDigestLocalHour}>{#each Array.from({ length: 24 }, (_, hour) => hour) as hour}<option value={hour}>{String(hour).padStart(2, '0')}:00</option>{/each}</select></label>
+            </div>
+          </fieldset>
+          <div class="mt-4 flex justify-end"><button type="button" class="app-button-secondary inline-flex items-center gap-2" disabled={mutationBusy || settingsLoading} on:click={saveNotificationSchedule}><Save size={16} /> {mutationBusy ? 'กำลังบันทึก...' : 'บันทึกเวลาแจ้งเตือน'}</button></div>
+        </section>
         <section class="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 sm:p-5" aria-labelledby="line-platform-title">
           <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div><h3 id="line-platform-title" class="flex items-center gap-2 text-sm font-semibold text-emerald-950"><Link2 size={17} /> LINE OA & Rich Menu</h3><p class="mt-1 text-xs leading-5 text-emerald-800">Platform เป็นผู้ดูแล LINE Login และ LIFF กลาง Tenant ใช้ URL นี้สร้างปุ่ม Link/URI ใน Rich Menu ของ LINE OA โดยไม่ต้องตั้ง LIFF ID เอง</p></div>

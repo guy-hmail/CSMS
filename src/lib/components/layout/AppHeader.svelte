@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Menu, PanelLeftClose, PanelLeftOpen, UserRound } from '@lucide/svelte';
   import ThemeToggle from '$lib/components/layout/ThemeToggle.svelte';
+  import NotificationCenter from '$lib/components/notifications/NotificationCenter.svelte';
 
   type HeaderContext = {
     churchName: string;
@@ -12,6 +13,7 @@
   export let onMenuClick: () => void;
   export let sidebarCollapsed = false;
   export let onSidebarToggle: () => void = () => {};
+  export let tenantId = '';
 </script>
 
 <header class="sticky top-0 z-30 border-b border-sky-100/80 bg-white/80 backdrop-blur-xl">
@@ -53,6 +55,7 @@
 
 
     <div class="flex shrink-0 items-center gap-2">
+      <NotificationCenter {tenantId} />
       <ThemeToggle />
       <button
         type="button"

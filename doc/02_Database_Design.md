@@ -341,7 +341,8 @@ Stores tenant-level church information.
 | `description` | text | Yes | | Description |
 | `timezone` | varchar(100) | No | Asia/Bangkok | Tenant timezone |
 | `approval_mode` | varchar(30) | No | auto_approve | auto_approve or approval_required |
-| `reporting_week_ends_on` | smallint | No | 0 | Reporting week-end weekday, PostgreSQL convention 0=Sunday |
+| `reporting_week_ends_on` | smallint | No | 0 | Calculation period-end weekday, PostgreSQL convention 0=Sunday |
+| `submission_deadline_days_after_period_end` | smallint | No | 1 | Local calendar days after `period_end` before normal submission closes; 1–6 |
 | `primary_metric_id` | uuid | Yes | | Tenant dashboard primary metric |
 | `status` | varchar(30) | No | provisioning | provisioning, trial, active, suspended, closed |
 | `trial_ends_at` | timestamptz | Yes | | Trial expiration |
@@ -359,6 +360,7 @@ alter table churches add constraint uq_churches_slug unique (slug);
 alter table churches add constraint ck_churches_status check (status in ('provisioning', 'trial', 'active', 'suspended', 'closed'));
 alter table churches add constraint ck_churches_approval_mode check (approval_mode in ('auto_approve', 'approval_required'));
 alter table churches add constraint ck_churches_week_end check (reporting_week_ends_on between 0 and 6);
+alter table churches add constraint ck_churches_submission_deadline_days check (submission_deadline_days_after_period_end between 1 and 6);
 ```
 
 ---
@@ -578,6 +580,8 @@ Defines canonical reporting weeks. Monthly, quarterly, yearly, and custom date-r
 | `period_end` | date | No | | End date |
 | `label` | varchar(100) | No | | Stable canonical label such as `2026-W27`; UI displays localized `period_end` |
 | `status` | varchar(30) | No | open | Period status |
+| `submission_opens_at` | timestamptz | Yes | | Snapshotted instant when normal data entry opens |
+| `submission_due_at` | timestamptz | Yes | | Snapshotted inclusive deadline for normal submission |
 | `created_at` | timestamptz | No | now() | Created time |
 | `updated_at` | timestamptz | No | now() | Updated time |
 
@@ -591,11 +595,13 @@ locked
 
 Rules:
 
-- A reporting week is exactly seven inclusive dates and ends on `churches.reporting_week_ends_on`.
+- A calculation week is exactly seven inclusive dates and ends on `churches.reporting_week_ends_on`.
+- Canonical generated periods snapshot `submission_opens_at` at local 00:00 on `period_end` and `submission_due_at` at local end-of-day after the configured deadline offset.
+- The deadline controls normal write eligibility, default UI state, and missing reminders; it never changes calculation or aggregation boundaries.
 - `year` and `week_no` use ISO year/week derived from `period_end`; UI does not show week number as the primary label.
 - Submission RPCs accept only `period_type = 'week'`.
 - A week is assigned to a month/quarter/year by `period_end`.
-- Approval is not controlled by period status. Late submissions are allowed only while status is `open`.
+- Period status is an administrative lock independent of the time window. Normal late submissions are rejected; an authorized `returned` correction may bypass the time deadline only while status remains `open`.
 
 Constraints:
 
@@ -608,6 +614,10 @@ alter table statistic_periods add constraint ck_week_period_shape check (
   and period_end = period_start + 6
 );
 alter table statistic_periods add constraint uq_period_per_church unique (church_id, period_start);
+alter table statistic_periods add constraint ck_statistic_periods_submission_window check (
+  (submission_opens_at is null and submission_due_at is null)
+  or (submission_opens_at is not null and submission_due_at is not null and submission_due_at >= submission_opens_at)
+);
 ```
 
 ---
@@ -865,6 +875,7 @@ create table churches (
     timezone varchar(100) not null default 'Asia/Bangkok',
     approval_mode varchar(30) not null default 'auto_approve',
     reporting_week_ends_on smallint not null default 0,
+    submission_deadline_days_after_period_end smallint not null default 1,
     primary_metric_id uuid,
     status varchar(30) not null default 'provisioning',
     trial_ends_at timestamptz,
@@ -876,6 +887,7 @@ create table churches (
     constraint ck_churches_status check (status in ('provisioning', 'trial', 'active', 'suspended', 'closed')),
     constraint ck_churches_approval_mode check (approval_mode in ('auto_approve', 'approval_required')),
     constraint ck_churches_week_end check (reporting_week_ends_on between 0 and 6),
+    constraint ck_churches_submission_deadline_days check (submission_deadline_days_after_period_end between 1 and 6),
     constraint ck_churches_active_status check (
         (status in ('provisioning', 'trial', 'active') and is_active = true)
         or (status in ('suspended', 'closed') and is_active = false)
@@ -1059,6 +1071,8 @@ create table statistic_periods (
     month_no integer,
     period_start date not null,
     period_end date not null,
+    submission_opens_at timestamptz,
+    submission_due_at timestamptz,
     label varchar(100) not null,
     status varchar(30) not null default 'open',
     created_at timestamptz not null default now(),
@@ -1069,6 +1083,10 @@ create table statistic_periods (
         week_no between 1 and 53
         and month_no is null
         and period_end = period_start + 6
+    ),
+    constraint ck_statistic_periods_submission_window check (
+        (submission_opens_at is null and submission_due_at is null)
+        or (submission_opens_at is not null and submission_due_at is not null and submission_due_at >= submission_opens_at)
     ),
     constraint uq_period_church_id unique (church_id, id),
     constraint uq_period_per_church unique (church_id, period_start)

@@ -392,3 +392,15 @@ verify_jwt = true
 [functions.report-export]
 enabled = true
 verify_jwt = true
+
+[functions.send-line-notification]
+enabled = true
+verify_jwt = false
+
+[functions.scan-missing-submissions]
+enabled = true
+verify_jwt = false
+
+[functions.send-pending-approval-digest]
+enabled = true
+verify_jwt = false

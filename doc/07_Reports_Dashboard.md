@@ -58,6 +58,15 @@ CSMS reporting follows these principles:
 10. All dashboard queries must be implemented through views or RPC functions.
 11. Every report must be scoped by `church_id` and accessible OU subtree.
 12. Reporting UI must be metric-aware and should render labels dynamically from `statistic_metrics`.
+13. `period_end` is the only weekly calculation/grouping boundary; `submission_due_at` controls workflow display but never moves values into a different month, quarter, or year.
+14. Period selectors must use `ensure_recent_reporting_periods` and render the configured weekday dynamically; clients must not hard-code Sunday.
+
+## 2.1 Calculation boundary versus submission deadline
+
+- Weekly KPIs, comparisons, trends, monthly/yearly assignment, completeness, and exports use `period_start`–`period_end`.
+- While a period is within its submission window, Dashboard/Reports may display its deadline and workflow state alongside the calculation range.
+- The default period is the latest completed calculation period. During its submission window it remains the operational focus for entry, approval, completeness, and reminders.
+- Changing the Tenant deadline affects newly generated period snapshots only and does not recalculate historical report membership.
 
 ---
 

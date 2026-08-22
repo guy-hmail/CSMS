@@ -71,6 +71,7 @@
 <div class="app-surface min-h-screen">
   <AppHeader
     context={shellContext}
+    tenantId={$tenantContext.activeTenant?.tenant_id ?? ''}
     onMenuClick={openMobileMenu}
     {sidebarCollapsed}
     onSidebarToggle={toggleSidebar}

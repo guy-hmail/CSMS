@@ -79,6 +79,17 @@ const client = createClient(postgrestUrl, publishableKey, {
   }
 });
 
+const serviceToken = signJwt({
+  sub: '00000000-0000-4000-8000-000000000001',
+  role: 'service_role',
+  aud: 'authenticated',
+  exp: Math.floor(Date.now() / 1000) + 300
+});
+const serviceClient = createClient(postgrestUrl, publishableKey, {
+  auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+  global: { headers: { Authorization: `Bearer ${serviceToken}` } }
+});
+
 const tenants = await listMyTenants(client);
 if (tenants.length !== 1 || tenants[0].tenant_id !== '81000000-0000-4000-8000-000000000001') {
   throw new Error(`Frontend identity integration failed: ${JSON.stringify(tenants)}`);
@@ -135,6 +146,14 @@ if (
 const submissionPeriod = submissionContext.periods[0];
 const submissionOu = submissionContext.organizationUnits.find((ou) => ou.code === 'GROUP-B')!;
 const requiredMetric = submissionContext.metrics.find((metric) => metric.isRequired)!;
+const { error: submissionWindowError } = await serviceClient
+  .from('statistic_periods')
+  .update({
+    submission_opens_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    submission_due_at: new Date(Date.now() + 60 * 60 * 1000).toISOString()
+  })
+  .eq('id', submissionPeriod.id);
+if (submissionWindowError) throw submissionWindowError;
 const existingSubmission = await getSubmissionByContext(client, submissionOu.id, submissionPeriod.id);
 if (existingSubmission !== null) {
   throw new Error(`Expected an unused current context: ${JSON.stringify(existingSubmission)}`);
@@ -300,6 +319,7 @@ await updateTenantSettings(client, {
   timezone: 'Asia/Bangkok',
   approvalMode: 'approval_required',
   reportingWeekEndsOn: 0,
+  submissionDeadlineDaysAfterPeriodEnd: 1,
   primaryMetricId: '87000000-0000-4000-8000-000000000001'
 });
 const approvalOu = submissionContext.organizationUnits.find((ou) => ou.code === 'GROUP-A')!;
@@ -341,6 +361,7 @@ await updateTenantSettings(client, {
   timezone: 'Asia/Bangkok',
   approvalMode: 'auto_approve',
   reportingWeekEndsOn: 0,
+  submissionDeadlineDaysAfterPeriodEnd: 1,
   primaryMetricId: '87000000-0000-4000-8000-000000000001'
 });
 await updateOrganizationUnitType(client, '83000000-0000-4000-8000-000000000002', {
@@ -374,7 +395,8 @@ await updatePlatformTenant(client, platformDetail.id, {
   description: platformDetail.description,
   timezone: platformDetail.timezone,
   approvalMode: platformDetail.approvalMode,
-  weekEndsOn: platformDetail.weekEndsOn
+  weekEndsOn: platformDetail.weekEndsOn,
+  submissionDeadlineDaysAfterPeriodEnd: platformDetail.submissionDeadlineDaysAfterPeriodEnd
 });
 const platformInvite = await createPlatformAdminInviteLink(client, platformDetail.id, 7);
 const [platformInvitations, platformActivity] = await Promise.all([

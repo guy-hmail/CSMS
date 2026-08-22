@@ -6,7 +6,17 @@ export type TenantSettingsPayload = {
   timezone: string;
   approvalMode: 'auto_approve' | 'approval_required';
   reportingWeekEndsOn: number;
+  submissionDeadlineDaysAfterPeriodEnd: number;
   primaryMetricId: string | null;
+};
+
+export type NotificationScheduleDay = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
+
+export type TenantNotificationSchedulePayload = {
+  enabled: boolean;
+  scheduleDays: NotificationScheduleDay[];
+  missingReminderLocalHour: number;
+  approvalDigestLocalHour: number;
 };
 
 export type OrganizationUnitTypePayload = {
@@ -49,6 +59,17 @@ export function updateTenantSettings(
   return callRpc<{ tenantId: string }>(client, 'update_tenant_settings', {
     p_payload: payload
   });
+}
+
+export function updateTenantNotificationSchedule(
+  client: SupabaseClient,
+  payload: TenantNotificationSchedulePayload
+) {
+  return callRpc<TenantNotificationSchedulePayload & { tenantId: string }>(
+    client,
+    'update_tenant_notification_schedule',
+    { p_payload: payload }
+  );
 }
 
 export function createOrganizationUnitType(

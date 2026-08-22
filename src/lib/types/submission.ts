@@ -26,6 +26,9 @@ export type SubmissionSelectorOption = {
   id: string;
   label: string;
   helperText?: string;
+  submissionOpensAt?: string | null;
+  submissionDueAt?: string | null;
+  submissionState?: 'not_open' | 'open' | 'overdue' | 'locked';
 };
 
 export type SubmissionStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'edit_requested' | 'returned';
@@ -47,7 +50,23 @@ export type SubmissionDetail = {
 };
 
 export type WeeklySubmissionContext = {
-  periods: Array<{ id: string; label: string; periodStart: string; periodEnd: string; year: number; weekNo: number; status: 'open' | 'closed' | 'locked' }>;
+  periods: Array<{
+    id: string;
+    label: string;
+    periodStart: string;
+    periodEnd: string;
+    year: number;
+    weekNo: number;
+    status: 'open' | 'closed' | 'locked';
+    submissionOpensAt: string | null;
+    submissionDueAt: string | null;
+    submissionState: 'not_open' | 'open' | 'overdue' | 'locked';
+    isSubmissionOpen: boolean;
+  }>;
+  defaultPeriodId: string | null;
+  reportingWeekEndsOn: number;
+  submissionDeadlineDaysAfterPeriodEnd: number;
+  timezone: string;
   organizationUnits: Array<{ id: string; name: string; code: string; path: string; level: number }>;
   metrics: SubmissionMetricDefinition[];
 };

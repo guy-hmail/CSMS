@@ -67,6 +67,7 @@ const tenantId = await createPlatformTenant(systemClient, {
   adminEmail: `root-${suffix}@example.test`,
   timezone: 'Asia/Bangkok',
   weekEndsOn: 'sunday',
+  submissionDeadlineDaysAfterPeriodEnd: 1,
   approvalMode: 'auto_approve'
 });
 const provisioned = await getPlatformTenantDetail(systemClient, tenantId);
@@ -110,7 +111,7 @@ const attendance = initialContext.metrics.find((metric) => metric.code === 'ATTE
 assert(attendance?.isRequired, 'required ATTENDANCE metric missing');
 await updateTenantSettings(rootClient, {
   name: `Full Loop ${suffix}`, timezone: 'Asia/Bangkok', approvalMode: 'approval_required',
-  reportingWeekEndsOn: 0, primaryMetricId: attendance.id
+  reportingWeekEndsOn: 0, submissionDeadlineDaysAfterPeriodEnd: 1, primaryMetricId: attendance.id
 });
 pass('tenant settings and dynamic metric context', { periods: initialContext.periods.length, metrics: initialContext.metrics.length, primaryMetric: attendance.code });
 
@@ -173,6 +174,14 @@ const context = await getWeeklySubmissionContext(rootClient);
 const period = context.periods[0];
 const requiredMetric = context.metrics.find((metric) => metric.code === 'ATTENDANCE');
 assert(requiredMetric, 'ATTENDANCE metric missing from refreshed context');
+const { error: submissionWindowError } = await serviceClient
+  .from('statistic_periods')
+  .update({
+    submission_opens_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    submission_due_at: new Date(Date.now() + 60 * 60 * 1000).toISOString()
+  })
+  .eq('id', period.id);
+if (submissionWindowError) throw submissionWindowError;
 const draft = await saveStatisticsDraft(rootClient, {
   clientRequestId: randomUUID(), expectedRevision: null, ouId: child.ouId, periodId: period.id,
   remarks: 'Full-loop draft 42', values: [{ metricId: requiredMetric.id, numericValue: 42, textValue: null, booleanValue: null }]

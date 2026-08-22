@@ -25,6 +25,10 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run test:auth
+      - run: npm run test:liff-config
+      - run: npm run test:notification-links
+      - run: npm run test:line-oa
+      - run: npm run test:notification-security
       - run: npm run build
         env:
           VERCEL: '1'
@@ -38,7 +42,8 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - run: deno test --allow-env supabase/functions/_shared/shared_test.ts
+      - run: npm run test:edge
+      - run: deno check --config supabase/functions/deno.json supabase/functions/send-line-notification/index.ts supabase/functions/scan-missing-submissions/index.ts supabase/functions/send-pending-approval-digest/index.ts
 
   database:
     runs-on: ubuntu-latest

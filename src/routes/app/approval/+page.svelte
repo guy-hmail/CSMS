@@ -43,10 +43,7 @@
   let initialPeriodSelected = false;
 
   function currentWeekPeriodId(periods: ApprovalQueue['periods']): string {
-    const now = new Date();
-    const sunday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + ((7 - now.getDay()) % 7));
-    const target = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`;
-    return periods.find((period) => period.periodEnd.slice(0, 10) === target)?.id ?? periods[0]?.id ?? '';
+    return periods[0]?.id ?? '';
   }
 
   async function loadQueue(keepSelection = false): Promise<void> {

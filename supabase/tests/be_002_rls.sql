@@ -96,7 +96,7 @@ $$;
 
 select pg_temp.assert_true(
     (
-        select count(*) = 17
+        select count(*) = 20
         from pg_class as relation
         join pg_namespace as namespace
           on namespace.oid = relation.relnamespace
@@ -105,7 +105,7 @@ select pg_temp.assert_true(
           and relation.relrowsecurity
           and relation.relforcerowsecurity
     ),
-    'RLS must be enabled and forced on all 17 business tables'
+    'RLS must be enabled and forced on all 20 business tables, including notification source, outbox, and attempts'
 );
 
 select pg_temp.assert_true(

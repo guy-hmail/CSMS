@@ -31,9 +31,18 @@
   let requestVersion = 0;
   let trendRequestVersion = 0;
 
-  type ReportingPeriodRow = { period_id: string; period_start: string; period_end: string; display_label: string };
+  type ReportingPeriodRow = {
+    period_id: string;
+    period_start: string;
+    period_end: string;
+    display_label: string;
+    submission_due_at: string | null;
+    submission_state: 'not_open' | 'open' | 'overdue' | 'locked';
+  };
   const thaiDateFormatter = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Bangkok' });
   const shortDateFormatter = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', timeZone: 'Asia/Bangkok' });
+  const weekdayFormatter = new Intl.DateTimeFormat('th-TH', { weekday: 'long', timeZone: 'Asia/Bangkok' });
+  const dueFormatter = new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   $: activeTenantId = $tenantContext.activeTenant?.tenant_id ?? '';
   $: if (mounted && activeTenantId && activeTenantId !== lastTenantId) {
     lastTenantId = activeTenantId;
@@ -43,7 +52,9 @@
   function thaiDate(value: string): string { return thaiDateFormatter.format(new Date(`${value}T00:00:00+07:00`)); }
   function shortDate(value: string): string { return shortDateFormatter.format(new Date(`${value}T00:00:00+07:00`)); }
   function periodOption(period: ReportingPeriodRow): DashboardOption {
-    return { id: period.period_id, label: `วันอาทิตย์ที่ ${thaiDate(period.period_end)}`, helperText: `รอบ ${thaiDate(period.period_start)} – ${thaiDate(period.period_end)}` };
+    const date = new Date(`${period.period_end}T00:00:00+07:00`);
+    const deadline = period.submission_due_at ? ` · กำหนดส่ง ${dueFormatter.format(new Date(period.submission_due_at))}` : '';
+    return { id: period.period_id, label: `${weekdayFormatter.format(date)}ที่ ${thaiDate(period.period_end)}`, helperText: `รอบคำนวณ ${thaiDate(period.period_start)} – ${thaiDate(period.period_end)}${deadline}` };
   }
   function flattenOus(nodes: OrganizationTreeNode[]): DashboardOption[] {
     return nodes.flatMap((node) => [{ id: node.id, label: `${'— '.repeat(Math.max(node.level - 1, 0))}${node.name}` }, ...flattenOus(node.children)]);
@@ -130,7 +141,7 @@
       const client = getSupabaseBrowserClient();
       const { data: sessionData } = await client.auth.getSession();
       if (!sessionData.session) { backendStatus = 'awaiting-auth'; return; }
-      const [tree, periodResult] = await Promise.all([getAccessibleOuTree(client), client.rpc('ensure_recent_sunday_periods')]);
+      const [tree, periodResult] = await Promise.all([getAccessibleOuTree(client), client.rpc('ensure_recent_reporting_periods')]);
       if (periodResult.error) throw periodResult.error;
       organizationUnits = flattenOus(tree.items);
       periods = ((periodResult.data ?? []) as ReportingPeriodRow[]).map(periodOption);

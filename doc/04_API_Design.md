@@ -252,6 +252,8 @@ Mutations of an existing versioned record also accept `expectedRevision`. The RP
 | `METRIC_NOT_FOUND` | Metric not found or inactive |
 | `INVALID_METRIC_VALUE` | Metric value does not match metric data type or validation |
 | `SUBMISSION_NOT_FOUND` | Submission not found |
+| `SUBMISSION_WINDOW_NOT_OPEN` | Calculation period has not reached its Tenant-local submission opening instant |
+| `SUBMISSION_DEADLINE_PASSED` | Normal submission deadline has passed; authorized returned corrections are handled separately |
 | `SUBMISSION_ALREADY_APPROVED` | Approved submission cannot be modified by current user |
 | `INVALID_STATUS_TRANSITION` | Workflow transition is not allowed |
 | `DUPLICATE_SUBMISSION` | Submission already exists for OU and period |
@@ -623,7 +625,7 @@ The RPC derives the current church membership, validates that `defaultOuId` belo
 
 ### `get_tenant_settings`
 
-Returns `name`, `slug`, `timezone`, `reportingWeekEndsOn`, `approvalMode`, and `primaryMetricId`. Any active tenant member may read the values needed for UI behavior.
+Returns `name`, `slug`, `timezone`, `reportingWeekEndsOn`, `submissionDeadlineDaysAfterPeriodEnd`, `approvalMode`, and `primaryMetricId`. Any active tenant member may read the values needed for UI behavior.
 
 ### `update_tenant_settings`
 
@@ -632,12 +634,13 @@ Returns `name`, `slug`, `timezone`, `reportingWeekEndsOn`, `approvalMode`, and `
   "name": "Main Church",
   "timezone": "Asia/Bangkok",
   "reportingWeekEndsOn": 0,
+  "submissionDeadlineDaysAfterPeriodEnd": 1,
   "approvalMode": "auto_approve",
   "primaryMetricId": "uuid"
 }
 ```
 
-Requires an active direct Root OU admin. Validate the primary metric belongs to the tenant, week-end range is 0–6, timezone is supported, and approval-mode rules from `set_tenant_approval_mode`. Slug changes use a separate platform-controlled operation. Write one tenant-wide audit event with old/new values.
+Requires an active direct Root OU admin. Validate the primary metric belongs to the tenant, calculation week-end range is 0–6, submission deadline offset is 1–6 local calendar days, timezone is supported, and approval-mode rules from `set_tenant_approval_mode`. Slug changes use a separate platform-controlled operation. Write one tenant-wide audit event with old/new values.
 
 ### LINE OA and Rich Menu configuration (read-only)
 
@@ -1035,6 +1038,7 @@ Phase: 1
 - Derive the tenant from the authenticated active membership.
 - Create only `period_type = 'week'` for submission periods.
 - Require exactly seven inclusive days and require `period_end` weekday to match the tenant setting.
+- Snapshot `submissionOpensAt` at Tenant-local 00:00 on `period_end` and `submissionDueAt` at Tenant-local end-of-day on `period_end + submissionDeadlineDaysAfterPeriodEnd`.
 - Derive ISO `year`, `week_no`, and canonical label from `period_end`; set `month_no = null`.
 - Prevent duplicate `(church_id, period_start)`.
 - Write an audit log.
@@ -1086,7 +1090,11 @@ Read-only tenant RPC used by submission, dashboard, and report selectors.
 }
 ```
 
-Returns `id`, `periodStart`, `periodEnd`, ISO year/week, canonical label, status, and a server-generated localized display label. The Thai UI uses the reporting date from `periodEnd`, for example `อา. 12 ก.ค. 2026`.
+Returns `id`, `periodStart`, `periodEnd`, ISO year/week, canonical label, status, `submissionOpensAt`, `submissionDueAt`, derived `submissionState`, `isSubmissionOpen`, and a server-generated localized display label. `periodEnd` remains the calculation/reporting date; the deadline is displayed separately.
+
+### `ensure_recent_reporting_periods`
+
+Creates/returns the latest completed Tenant-configured calculation period plus four previous periods. It derives dates in `churches.timezone`, never hard-codes Sunday, and snapshots the submission window on insert. `ensure_recent_sunday_periods` remains only as a backward-compatible four-column wrapper and must not be used by new clients.
 
 ---
 
@@ -1266,6 +1274,8 @@ Dashboard summary cards, trend selection, and child OU comparison return only th
 ---
 
 # 16. Submission APIs
+
+Normal `save_statistics_draft` and `submit_statistics` calls require the selected period's derived submission state to be `open`. The server returns `SUBMISSION_WINDOW_NOT_OPEN` before `submissionOpensAt`, `SUBMISSION_DEADLINE_PASSED` after `submissionDueAt`, and `PERIOD_LOCKED` for an administrative close/lock. A submission in `returned` state is a narrowly scoped exception created by the authorized correction workflow and may be saved/resubmitted after the time deadline while the period status remains `open`.
 
 ## 16.0 `list_submissions`
 
@@ -2088,7 +2098,113 @@ Phase: 2 (audit writing remains mandatory for critical mutations from Phase 1)
 
 Implementation plan and release gates: `doc/15_Notifications_Phase_Plan.md`.
 
-## 21.1 `send-line-notification`
+All browser-facing RPCs derive `church_id` and the recipient from the validated session. They never accept a Tenant ID, recipient ID, role, provider credential, or arbitrary external deep-link host. Cross-Tenant and other-recipient IDs return `NOTIFICATION_NOT_FOUND` without existence disclosure.
+
+## 21.1 `list_notifications`
+
+Type: Supabase RPC
+Access: Authenticated user
+
+### Request
+
+```json
+{
+  "p_limit": 20,
+  "p_cursor_created_at": null,
+  "p_cursor_id": null,
+  "p_include_archived": false
+}
+```
+
+`p_limit` is 1–100. Cursor timestamp and ID must be supplied together. Ordering is `(created_at desc, id desc)` for stable keyset pagination.
+
+### Response data
+
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "eventType": "submission_submitted",
+      "title": "มีรายงานรออนุมัติ",
+      "body": "กลุ่ม A ส่งรายงานแล้ว",
+      "ouId": "uuid",
+      "deepLink": "/app/approval",
+      "payload": { "submissionId": "uuid" },
+      "createdAt": "timestamptz",
+      "readAt": null,
+      "archivedAt": null
+    }
+  ],
+  "nextCursor": { "createdAt": "timestamptz", "id": "uuid" }
+}
+```
+
+The default feed excludes archived rows. Payloads are server-created, non-secret UI context only. The target route must authorize the user again.
+
+## 21.2 `get_unread_notification_count`
+
+Type: Supabase RPC
+Access: Authenticated user
+Request: none
+Response data: `{ "count": 3 }`
+
+Counts unread, non-archived records belonging to the caller in the active Tenant.
+
+## 21.3 `mark_notification_read`
+
+Type: Supabase RPC
+Access: Authenticated owner
+Request: `{ "p_notification_id": "uuid" }`
+Response data: `{ "id": "uuid", "readAt": "timestamptz" }`
+
+The operation is idempotent and preserves the first `read_at`. Ownership failure returns `NOTIFICATION_NOT_FOUND`.
+
+## 21.4 `mark_all_notifications_read`
+
+Type: Supabase RPC
+Access: Authenticated user
+Request: none
+Response data: `{ "count": 3 }`
+
+Updates only unread, non-archived rows for the caller in the active Tenant and records one sanitized audit summary.
+
+## 21.5 `archive_notification`
+
+Type: Supabase RPC
+Access: Authenticated owner
+Request: `{ "p_notification_id": "uuid" }`
+Response data: `{ "id": "uuid", "readAt": "timestamptz", "archivedAt": "timestamptz" }`
+
+Archive is idempotent and also marks the row read. No notification message payload is copied into the audit log.
+
+## 21.6 Internal `enqueue_notification`
+
+`app_security.enqueue_notification(...)` is an internal database helper callable by trusted business RPCs only. Execute is revoked from `anon` and `authenticated`. It validates an allowlisted event type, active recipient membership, active OU subtree scope, preference, relative `/app/...` deep link, and recursively rejects token/secret-like payload keys. The unique `(church_id, recipient_user_id, event_key)` key makes replay return the original row without overwriting it.
+
+Stage A established the In-app source of truth. Stage C trusted business RPCs explicitly request a `line` delivery row; this still performs no provider call and preference-disabled LINE delivery is skipped without suppressing the In-app record.
+
+### In-app client behavior (Stage B)
+
+`NotificationCenter.svelte` calls only the owner-scoped RPCs above. Its state is keyed by the active Tenant ID: switching Tenant closes the panel, clears cached items/count, and reloads after the refreshed Tenant session is available. Badge updates are reconciled immediately after mark-read, mark-all, and archive responses.
+
+Before navigation, `safeNotificationDeepLink` accepts only known `/app/...` routes and rejects external hosts, traversal, and URL-bearing query input. This client check is defense in depth; the destination route and backend must still authorize the active Tenant, role, and OU scope.
+
+### Automatic business events (Stage C)
+
+`submit_statistics`, `approve_submission`, `return_submission_for_edit`, `request_submission_edit`, `approve_submission_edit_request`, `assign_ou_member`, and the two service-role invitation-acceptance RPCs enable a transaction-local notification context around their existing mutation implementations. Database triggers enqueue only while this context is active, so direct owner maintenance, migrations, seed data, and fixtures do not manufacture user-facing events.
+
+Recipient selection is server-side:
+
+- `submission_submitted` selects active administrators, managers, and approvers assigned to the target OU or an ancestor.
+- `submission_approved` and `submission_returned` select the recorded submitter.
+- `edit_request_created` mirrors the actionable edit-request permission path and selects active administrators/managers in scope.
+- `edit_request_resolved` selects the user who requested the edit.
+- `ou_assignment_created` selects the newly assigned active member, including assignments created by accepted invitations.
+
+The notification and optional delivery outbox row are written inside the business transaction. Any database enqueue failure rolls back the mutation; a future LINE provider outage cannot affect the mutation because no provider call occurs in this path. Internal pre-wrapper implementations are in `app_security` and are not executable by browser or service roles, preventing callers from bypassing event creation.
+
+## 21.7 `send-line-notification`
 
 Claims pending notification deliveries and sends them through the central CSMS LINE OA. This function is an internal worker endpoint; browser clients and Tenant settings cannot provide credentials or arbitrary recipients.
 
@@ -2110,7 +2226,11 @@ Phase: 3
 }
 ```
 
-The worker claims eligible `pending` delivery rows. Recipient IDs, template/event payload and deep links come from server-created notification records, never from an arbitrary browser request.
+The endpoint requires the project service-role credential and accepts only an optional integer `limit` from 1–50. It returns aggregate counts (`claimed`, `sent`, `failed`, `deadLetter`, `finalizationFailed`) and never recipient IDs or message bodies. When `LINE_DELIVERY_ENABLED` is false it returns a zero-count disabled result without claiming work.
+
+The worker claims due `pending`/`failed` rows and processing leases older than ten minutes using row locks with `SKIP LOCKED`. `LINE_DELIVERY_CANARY_CHURCH_IDS` is mandatory when enabled: UUIDs scope a canary, while `*` is the explicit all-Tenant value. Recipient membership, preference, OU scope, and LINE identity are resolved again immediately before each claim.
+
+The LINE Push uses the delivery UUID as `X-Line-Retry-Key`. Accepted 2xx and already-accepted 409 responses complete as sent; 408, 429, network, and 5xx failures retry; other 4xx responses enter dead letter immediately. Retryable attempt 1 waits 30 minutes, attempt 2 waits 2 hours, and attempt 3 enters dead letter. An operator can call the service-role-only `replay_line_notification_delivery` RPC to create a new delivery cycle; the action records only status/count/cycle metadata in the audit log.
 
 ### Rules
 
@@ -2122,6 +2242,8 @@ The worker claims eligible `pending` delivery rows. Recipient IDs, template/even
 - Respect active membership and user notification preferences resolved by the backend.
 - Retry only retryable provider failures; retain permanent failures as delivery history/dead letter.
 - A LINE delivery failure must not delete the In-app notification.
+- Provider credentials are read only from Edge Function secrets; the worker log context omits LINE user IDs and notification message fields.
+- `LINE_DELIVERY_APP_BASE_URL` must be HTTPS and is the only allowed origin for generated deep links.
 
 ---
 
@@ -2131,7 +2253,7 @@ The worker claims eligible `pending` delivery rows. Recipient IDs, template/even
 
 Finds data-entry OUs with missing submissions for an open period.
 
-Type: Scheduled Supabase Edge Function  
+Type: Scheduled Supabase Edge Function
 Phase: 3
 
 ### Rules
@@ -2140,6 +2262,31 @@ Phase: 3
 - Check if submission exists for target period.
 - Create idempotent reminder notification/delivery records; the delivery worker sends LINE separately.
 - Skip closed periods, submitted OUs, inactive OUs and inactive recipients.
+
+The protected Edge Function accepts no user-selected Tenant, recipient, period, OU, or run time. It requires the exact service-role scheduler credential and reads only platform environment configuration. `NOTIFICATION_SCHEDULE_ENABLED=false` returns a zero-count result without invoking the database. When enabled, `NOTIFICATION_SCHEDULE_CANARY_CHURCH_IDS` must contain explicit Tenant UUIDs or the deliberate all-Tenant value `*`.
+
+Supabase Cron should invoke this function hourly. The Edge Function calls `run_tenant_missing_submission_reminders`, which applies the platform kill switch/canary and then reads `notification_schedule_enabled`, `notification_schedule_days`, `missing_reminder_local_hour`, and `timezone` from each Tenant. Only the latest period satisfying `submissionOpensAt <= runAt <= submissionDueAt` is considered; it must still be administratively `open`. No normal missing reminder is created before opening or after the deadline. Active data-entry OUs with any non-deleted submission row (including a draft) are skipped. Exact-OU data-entry users and ancestor managers are selected server-side. The event key contains period, OU, and Tenant-local date, so later hourly runs are safe replays.
+
+## 22.2 `send-pending-approval-digest`
+
+Creates one daily summary for every active recipient who can currently act on at least one `submitted` record.
+
+Type: Scheduled Supabase Edge Function
+Phase: 3
+
+The same service-role, kill-switch, and Tenant-canary rules apply. The Edge Function calls `run_tenant_pending_approval_digests`, which reads the Tenant-owned enabled state, selected weekdays, `approval_digest_local_hour`, and timezone. Recipient selection mirrors the approval workflow: the nearest active approver handles an OU, an approver with override may act, and Root Admin fallback follows the existing workflow rules. Each recipient receives one notification containing only the actionable count and local digest date; individual submission details are not copied into the digest payload. The deep link opens `/app/approval`, where normal authorization resolves the current queue again.
+
+### `update_tenant_notification_schedule`
+
+Direct Root OU Admin only. Accepts `enabled`, `scheduleDays` (one or more unique values from `MON`, `TUE`, `WED`, `THU`, `FRI`, `SAT`, `SUN`), `missingReminderLocalHour`, and `approvalDigestLocalHour` (0–23). Values are persisted on `churches`, audited, and evaluated in the Tenant timezone. Platform operators retain the outer environment kill switch and canary scope; Tenant settings cannot bypass them.
+
+Both schedule RPCs use transaction-level advisory locks, deterministic event keys, the existing preference resolver/outbox, and audit rows containing window metadata only. Browser roles cannot execute the RPCs or their internal approval helper.
+
+## 22.3 `get_platform_notification_operations`
+
+Returns notification health for one explicitly selected Tenant and a 1–720 hour window. Requires an authenticated `system_admin`; normal Tenant administrators and members receive `SYSTEM_ADMIN_REQUIRED`.
+
+The summary includes In-app/delivery creation counts, pending/processing/retry/dead-letter depth, stale leases, oldest queue timestamp, sent/dead-letter window counts and rates, and attempt classifications. Event groups contain only event type and counts. Recent dead letters contain only correlation UUIDs, event type, attempt/cycle, sanitized error code, and timestamp. Recipient identity, LINE ID, notification title/body/deep link/payload, error message, and provider response are never returned.
 
 ---
 

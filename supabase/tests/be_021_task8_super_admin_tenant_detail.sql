@@ -18,11 +18,13 @@ select pg_temp.assert_true(
 
 select public.update_platform_tenant('81000000-0000-4000-8000-000000000001', jsonb_build_object(
   'name', 'Tenant Task 8', 'slug', 'tenant-task-8', 'description', 'control plane test',
-  'timezone', 'Asia/Bangkok', 'approvalMode', 'approval_required', 'weekEndsOn', 'saturday'
+  'timezone', 'Asia/Bangkok', 'approvalMode', 'approval_required', 'weekEndsOn', 'saturday',
+  'submissionDeadlineDaysAfterPeriodEnd', 2
 ));
 select pg_temp.assert_true(
   (public.get_platform_tenant_detail('81000000-0000-4000-8000-000000000001') #>> '{name}') = 'Tenant Task 8'
-  and (public.get_platform_tenant_detail('81000000-0000-4000-8000-000000000001') #>> '{weekEndsOn}') = 'saturday',
+  and (public.get_platform_tenant_detail('81000000-0000-4000-8000-000000000001') #>> '{weekEndsOn}') = 'saturday'
+  and (public.get_platform_tenant_detail('81000000-0000-4000-8000-000000000001') #>> '{submissionDeadlineDaysAfterPeriodEnd}') = '2',
   'tenant detail/update round-trips configuration'
 );
 

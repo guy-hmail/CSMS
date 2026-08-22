@@ -59,6 +59,7 @@ $supabaseUrl = "https://$ProjectRef.supabase.co"
 $productionLiffId = $localEnvironment['PUBLIC_LINE_LIFF_PRODUCTION_ID']
 $developmentLiffId = $localEnvironment['PUBLIC_LINE_LIFF_ID']
 $productionAppUrl = $localEnvironment['PUBLIC_PRODUCTION_APP_URL']
+$lineOaBasicId = $localEnvironment['PUBLIC_LINE_MESSAGING_OA_BASIC_ID']
 
 Add-VercelEnvironmentVariable 'PUBLIC_SUPABASE_URL' 'production,preview' $supabaseUrl
 Add-VercelEnvironmentVariable 'PUBLIC_SUPABASE_ANON_KEY' 'production,preview' $publishableKey
@@ -66,5 +67,6 @@ Add-VercelEnvironmentVariable 'PUBLIC_LINE_LIFF_ID' 'production' $productionLiff
 Add-VercelEnvironmentVariable 'PUBLIC_LINE_LIFF_ID' 'preview' $developmentLiffId
 Add-VercelEnvironmentVariable 'PUBLIC_LINE_LIFF_PRODUCTION_ID' 'production,preview' $productionLiffId
 Add-VercelEnvironmentVariable 'PUBLIC_PRODUCTION_APP_URL' 'production,preview' $productionAppUrl
+Add-VercelEnvironmentVariable 'PUBLIC_LINE_MESSAGING_OA_BASIC_ID' 'production,preview' $lineOaBasicId
 Add-VercelEnvironmentVariable 'PUBLIC_APP_ENV' 'production' 'production'
 Add-VercelEnvironmentVariable 'PUBLIC_APP_ENV' 'preview' 'preview'

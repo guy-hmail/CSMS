@@ -250,7 +250,80 @@ Decision: success / frontend rollback / forward DB fix / PITR restore
 Follow-up incident/task:
 ```
 
-## 11. References
+## 11. Notification Stage A rollout and rollback
+
+Stage A is an additive database release only: `notifications`, `notification_deliveries`, internal resolver/enqueue helpers, and owner-scoped read/archive RPCs. It contains no LINE provider integration.
+
+Before applying the migration:
+
+- keep `LINE_DELIVERY_ENABLED=false`; do not deploy or invoke a LINE sender
+- run the full DB regression suite, notification test, database lint, frontend check and production build on Preview/local
+- confirm production migration history and backup/PITR checkpoint
+- verify no Tenant table or browser environment contains Messaging API credentials
+
+After applying the migration:
+
+- smoke-test list, unread count, mark read, mark all and archive with two users and two Tenants
+- verify cross-Tenant/other-recipient IDs return `NOTIFICATION_NOT_FOUND`
+- verify queue depth is zero unless a trusted canary deliberately requested optional delivery creation
+- inspect audit rows for action/count metadata only; notification body/payload and secrets must be absent
+
+Rollback is a forward fix. The additive tables must not be dropped or truncated in production. If read APIs regress, disable the future Notification Center route (Stage B) and apply a corrective migration. If isolation is incorrect, disable the affected API/route immediately, keep LINE disabled, treat it as a security incident, and forward-fix RLS/functions before reopening.
+
+Production actions intentionally deferred after Stage A: apply the migration, confirm central OA Basic ID/Channel ID/quota owner, set secrets, create the canary recipient, deploy the Stage D worker, and collect Preview/production smoke evidence.
+
+## 12. Notification Stage C rollout and rollback
+
+Stage C adds transactional event emission to existing submission, approval, edit-request, OU-assignment and invitation-acceptance RPCs. It can create pending `line` outbox rows, but it does not deploy or call a LINE provider worker. Keep `LINE_DELIVERY_ENABLED=false` throughout this release.
+
+Before applying `20260812020000_notification_business_events.sql`:
+
+- verify Stage A is present and take the normal production migration-history and backup/PITR checkpoint
+- run `be_005`, `be_010`, `be_017`, `be_020`, `be_026`, `be_027`, database lint, frontend check and production build
+- record queue depth before migration; existing pending rows must not be replayed by this migration
+
+After applying:
+
+- submit one canary report and confirm only actionable in-scope recipients receive `submission_submitted`
+- approve and return canary reports and confirm the recorded submitter receives one deterministic event per revision
+- create and resolve an edit request and confirm managers/admins receive the request while the requester receives the resolution
+- assign one canary user directly and through an invitation; verify one In-app record and the preference-eligible pending outbox row
+- confirm audit and notification payloads contain no LINE user ID, access token, secret or authorization value
+
+Rollback is a forward fix. Do not drop notifications or delivery rows. If recipient selection is wrong, immediately stop the affected business mutation endpoint or apply a corrective migration while outbound LINE remains disabled. Because function implementations were moved behind internal wrappers, rollback must preserve the public RPC signatures and grants; do not expose the internal `app_security.*_without_notification_events` functions as a shortcut.
+
+## 13. Notification Stage D rollout and rollback
+
+Stage D adds the protected `send-line-notification` worker, bounded attempt history/manual replay, and central OA Add Friend guidance. The database migration is additive and does not send messages by itself.
+
+Before applying `20260812030000_notification_line_delivery.sql`:
+
+- take the normal backup/PITR checkpoint and record pending/failed/dead-letter queue depth
+- run `be_028`, the shared Deno tests, Deno function type-check, frontend check, production build, and database lint
+- confirm the central OA owner, quota owner, incident owner, Messaging API access token, public Basic ID, HTTPS production app URL, and one test Tenant UUID
+- keep `LINE_DELIVERY_ENABLED=false`; never start with `LINE_DELIVERY_CANARY_CHURCH_IDS=*`
+
+Deploy the worker with JWT verification disabled only because the function performs its own exact service-role credential check. Configure a protected scheduler with that credential, confirm a disabled invocation claims zero rows, then enable only the approved Tenant UUID. Verify one In-app record remains available before and after a successful Push, a safe deep link opens through normal authorization, and no sensitive values appear in logs or attempt history.
+
+Rollback does not drop or truncate delivery/attempt tables. Set `LINE_DELIVERY_ENABLED=false` first; this immediately stops new claims while preserving In-app records and durable queue rows. If a provider call was accepted but finalization failed, retain the same delivery UUID retry key so LINE can deduplicate the retry. Forward-fix schema/function defects. Replay dead letters only after root cause correction and an operator review; each replay creates a new cycle and audit record.
+
+## 14. Notification Stage E rollout and rollback
+
+Stage E is additive: it deploys two protected scheduled functions and database RPCs but creates no Cron job automatically. Keep `NOTIFICATION_SCHEDULE_ENABLED=false` while applying `20260812040000_notification_schedules.sql` and deploying functions.
+
+Before canary enablement, run `be_029`, shared Deno tests, both function type-checks, frontend check/build, and database lint. Confirm the test Tenant timezone, latest due period/status, active reminder recipients, active approver assignments, and preference settings. Create hourly Cron jobs using a Vault-held credential, record job IDs/owners, and verify disabled zero-count responses.
+
+Enable one Tenant UUID only. Invoke twice and verify deterministic same-day deduplication, correct OU/approval scope, and that In-app records remain when optional LINE preferences are disabled. Rollback by setting `NOTIFICATION_SCHEDULE_ENABLED=false` and disabling both Cron jobs. Do not delete notifications/outbox rows or revert the additive RPC migration. If recipient logic is wrong, treat it as a notification-scope incident and forward-fix before re-enabling. `LINE_DELIVERY_ENABLED=false` remains the independent emergency stop for outbound messages.
+
+## 15. Notification Stage F production gate
+
+Stage F adds privacy-minimized operations visibility and release evidence, not automatic production authorization. Before migration/deployment, the release commit must pass the full database suite, Edge tests/checks, frontend build, dependency audit, database lint, and automated notification security review.
+
+Deploy with both notification kill switches false. Capture disabled evidence, then use one dedicated recipient and one Tenant. The System Admin operations panel is the primary queue-health view; logs and database access remain restricted. Do not promote to `*` until every checkbox in `doc/18_Notifications_Production_Evidence.md` has an owner and evidence reference.
+
+For provider outage/quota exhaustion, stop LINE only and retain In-app/schedules. For recipient-scope/security concerns, stop both LINE and schedules and treat the event as an incident. Rotate secrets while delivery is disabled, test a single recipient, revoke old credentials, and restore canary scope. Manual replay is per delivery after root-cause correction; never truncate or bulk-reset the queue.
+
+## 16. References
 
 - [Vercel: Rolling back a production deployment](https://vercel.com/docs/deployments/rollback-production-deployment)
 - [Vercel: Instant Rollback](https://vercel.com/docs/instant-rollback)

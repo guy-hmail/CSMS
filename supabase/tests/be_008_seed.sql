@@ -7,6 +7,37 @@ begin
     if (select count(*) from public.churches where code = 'DEMO') <> 1 then
         raise exception 'BE-008: expected demo tenant';
     end if;
+    if not exists (
+        select 1
+        from public.churches
+        where id = '81000000-0000-4000-8000-000000000001'
+          and reporting_week_ends_on = 0
+          and submission_deadline_days_after_period_end = 1
+    ) then
+        raise exception 'BE-008: expected Sunday calculation end and +1 day submission deadline';
+    end if;
+    if not exists (
+        select 1
+        from public.users u
+        join auth.users au on au.id = u.auth_user_id
+        join public.church_members cm
+          on cm.church_id = '81000000-0000-4000-8000-000000000001'
+         and cm.user_id = u.id
+         and cm.status = 'active'
+        join public.ou_members om
+          on om.church_id = cm.church_id
+         and om.church_member_id = cm.id
+         and om.ou_id = '84000000-0000-4000-8000-000000000001'
+         and om.permission = 'admin'
+         and om.is_active = true
+         and om.deleted_at is null
+        where u.line_user_id = 'U3a58a17bfa7d286fba62bd02c81a9311'
+          and u.last_active_church_id = cm.church_id
+          and u.global_role = 'user'
+          and u.is_active = true
+    ) then
+        raise exception 'BE-008: expected seeded LINE user to be an active Demo Church tenant admin';
+    end if;
     if (select count(*) from public.organization_units where church_id = '81000000-0000-4000-8000-000000000001') <> 5 then
         raise exception 'BE-008: expected five demo OUs';
     end if;
