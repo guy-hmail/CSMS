@@ -347,7 +347,25 @@ Deploy with both notification kill switches false. Capture disabled evidence, th
 
 For provider outage/quota exhaustion, stop LINE only and retain In-app/schedules. For recipient-scope/security concerns, stop both LINE and schedules and treat the event as an incident. Rotate secrets while delivery is disabled, test a single recipient, revoke old credentials, and restore canary scope. Manual replay is per delivery after root-cause correction; never truncate or bulk-reset the queue.
 
-## 16. References
+## 16. Production release record — 22 Aug 2026
+
+- Application commits: `343f252` (`feat: improve dark mode and submission rollover`) and `18de1a3` (`fix: open pre-created submission periods on rollover`)
+- Previous production deployment: `dpl_3b6buq5af4S9xgsVrKQuKC7HHrbn` (`https://csms-pypectn7i-hpstat.vercel.app`)
+- Preview deployment: `dpl_8aFajfBCE7ymtmroFQuWv5WN3BtV` (`https://csms-actwffnfq-hpstat.vercel.app`)
+- Production deployment: `dpl_CvLSemegYtgCjaqYt1bVY2KtSSFc` (`https://csms-qo0f3860h-hpstat.vercel.app`), aliased to `https://csms-rouge.vercel.app`
+- CI evidence: GitHub Actions runs `32566345131` and `32566770891`; application, Edge and database jobs passed
+- Production backup checkpoint: `D:\Projects\ST10-backups\25690822-170029` (Asia/Bangkok)
+  - `roles.sql`: SHA-256 `25873CEC56A2CC6514E204F420231777F85C03DA818CAA7090CDCDFA89776ECD`
+  - `schema.sql`: SHA-256 `A479FE23D5EB171A8A5298DCDB509326FA5F9ABF1C2C1092F492D01C8D39244D`
+  - `data.sql`: SHA-256 `0C3F1E73B56DC64FA30891462C07009BBC895F10A06A352194A0F30FF5475331`
+- Production migrations: `20260822010000_submission_period_rollover.sql` and corrective migration `20260822020000_submission_rollover_existing_periods.sql`; local and remote migration histories match
+- Authenticated smoke: Submissions selected 17–23 Aug 2026 (week 34), opened immediately, due 24 Aug 2026 23:59; Dashboard and Reports remained on 10–16 Aug 2026 (week 33)
+- Public smoke: `/`, `/app`, `/app/submissions`, `/app/dashboard`, `/app/reports`, and `/app/settings/tenant` returned HTTP 200; HSTS and `X-Frame-Options: DENY` present
+- Observed issue: the first production smoke found an already-created future period retaining its later `opens_at`; fixed forward by `20260822020000` and reverified before release completion
+- Decision: success after forward database fix. Frontend rollback target remains `dpl_3b6buq5af4S9xgsVrKQuKC7HHrbn`; database restore checkpoint is the backup above and requires the approval/reconciliation procedure in section 9
+- Notification delivery remains disabled; this release does not authorize LINE delivery or scheduled notification enablement
+
+## 17. References
 
 - [Vercel: Rolling back a production deployment](https://vercel.com/docs/deployments/rollback-production-deployment)
 - [Vercel: Instant Rollback](https://vercel.com/docs/instant-rollback)
