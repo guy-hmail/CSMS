@@ -37,6 +37,27 @@ where period.id = (
   limit 1
 );
 
+insert into public.statistic_periods (
+  church_id, year, week_no, period_start, period_end, label, status,
+  submission_opens_at, submission_due_at
+)
+select
+  '81000000-0000-4000-8000-000000000001',
+  extract(isoyear from completed.period_end + 7)::integer,
+  extract(week from completed.period_end + 7)::integer,
+  completed.period_end + 1,
+  completed.period_end + 7,
+  to_char(completed.period_end + 7, 'YYYY-MM-DD'),
+  'open',
+  (completed.period_end + 7)::timestamp at time zone 'Asia/Bangkok',
+  ((completed.period_end + 9)::timestamp at time zone 'Asia/Bangkok') - interval '1 microsecond'
+from initial_completed_periods completed
+order by completed.period_end desc
+limit 1
+on conflict on constraint uq_period_per_church do update
+set submission_opens_at = excluded.submission_opens_at,
+    submission_due_at = excluded.submission_due_at;
+
 set local role authenticated;
 create temporary table rollover_context as
 select public.get_weekly_submission_context() #> '{data}' response;
@@ -53,8 +74,9 @@ select pg_temp.assert_true(
     and (response #>> '{periods,0,periodStart}')::date
       = (response #>> '{periods,1,periodEnd}')::date + 1
     and response #>> '{periods,0,submissionState}' = 'open'
+    and (response #>> '{periods,0,submissionOpensAt}')::timestamptz <= now()
    from rollover_context),
-  'submission context rolls to the next week immediately after the previous deadline'
+  'submission context moves a pre-created next week earlier and opens it immediately after the previous deadline'
 );
 
 select pg_temp.assert_true(
