@@ -1,40 +1,40 @@
 # Notifications Production Evidence
 
-Status: Pending production execution
+Status: Production infrastructure deployed disabled; canary pending
 
 Release candidate:
 
-- Git commit:
-- Preview deployment URL:
-- Hosted Supabase project reference:
-- Migration backup/PITR checkpoint:
-- Last-known-good frontend deployment:
+- Git commit: `f63d51c`
+- Preview deployment URL: `https://csms-o6le8j48x-hpstat.vercel.app` (`dpl_3bz2TteXk6384FCkd31MDfwDdx9c`)
+- Hosted Supabase project reference: `obouxyorkjnbwjpllhyg`
+- Migration backup/PITR checkpoint: manual logical backup `D:\Projects\ST10-backups\25690822-142238`, 22 August 2026 14:22 Asia/Bangkok
+- Last-known-good frontend deployment: `dpl_5qe33Qg2mZaFh2BjaTYkjyTdzm5g`
 - Test Tenant ID:
 - Dedicated test recipient owner:
-- Operator:
+- Operator: Codex release execution with product-owner approval
 - Incident owner:
 - Quota owner:
 
 ## 1. Preflight evidence
 
-- [ ] CI application, Edge Function, and database jobs pass on the release commit
-- [ ] `npm run preflight:production` passes on a clean checkout
-- [ ] Clean migration replay and full database suite pass
-- [ ] Database lint reports no errors
+- [x] CI application, Edge Function, and database jobs pass on the release commit
+- [x] `npm run preflight:production` passes on a clean checkout
+- [x] Clean migration replay and full database suite pass
+- [x] Database lint reports no errors
 - [ ] Messaging API credentials are present only in Supabase secrets
 - [ ] Central OA Basic ID and production HTTPS app URL are confirmed
-- [ ] Backup/PITR restore ownership is confirmed
+- [x] Backup/PITR restore ownership is confirmed
 
 Attach links/log IDs without copying credentials or notification bodies:
 
 ## 2. Disabled deployment evidence
 
-- [ ] Migrations A–F applied successfully
-- [ ] All notification Edge Functions deployed
-- [ ] `LINE_DELIVERY_ENABLED=false`
-- [ ] `NOTIFICATION_SCHEDULE_ENABLED=false`
-- [ ] Disabled delivery worker invocation claims zero rows
-- [ ] Disabled reminder and digest invocations create zero rows
+- [x] Migrations A–F applied successfully
+- [x] All notification Edge Functions deployed
+- [x] `LINE_DELIVERY_ENABLED=false`
+- [x] `NOTIFICATION_SCHEDULE_ENABLED=false`
+- [x] Disabled delivery worker invocation claims zero rows
+- [x] Disabled reminder and digest invocations create zero rows
 - [ ] Notification Center still creates/displays In-app notifications
 
 ## 3. Preview/canary evidence
@@ -64,11 +64,11 @@ Record notification/delivery correlation UUIDs only:
 
 ## 5. Promotion decision
 
-- Decision: Go / No-Go
-- Approved Tenant scope:
-- Approval timestamp:
-- Approver:
-- Observability window:
+- Decision: Go for disabled infrastructure; No-Go for canary/global delivery
+- Approved Tenant scope: none; delivery and schedules remain disabled
+- Approval timestamp: 22 August 2026, Asia/Bangkok
+- Approver: product owner via release instruction
+- Observability window: started after production deployment `dpl_3b6buq5af4S9xgsVrKQuKC7HHrbn`
 - Follow-up ticket(s):
 
 Never paste service-role keys, LINE credentials, full provider responses, recipient LINE IDs, or message bodies into this evidence file.

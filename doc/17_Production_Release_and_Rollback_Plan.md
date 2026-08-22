@@ -1,12 +1,36 @@
 # Production Release and Rollback Plan
 
-สถานะ: **Release candidate — ต้องผ่าน gate ก่อน deploy**
+สถานะ: **Production deployed — notification delivery/schedules disabled; canary pending**
 
 Production URL: `https://csms-rouge.vercel.app/`
 
-Baseline production commit ก่อน release: `14f457f` (`origin/main` ณ วันที่จัดทำแผน)
+Baseline production commit ก่อน release: `297ec64`
 
-Feature candidate commit: `d385a4b`
+Feature candidate commit: `f63d51c`
+
+## Release result — 22 August 2026
+
+- Decision: **RELEASE SUCCESS for disabled infrastructure. CANARY NO-GO until LINE credentials, OA Basic ID, test Tenant and recipient evidence are complete.**
+- Git/CI: `f63d51c`; GitHub Actions run `32559682901` passed application, Edge Function and database jobs
+- Backup checkpoint: `D:\Projects\ST10-backups\25690822-142238` at 22 August 2026 14:22 Asia/Bangkok; 17 tables and 46 COPY sections
+- Database: migrations `20260812010000`–`20260812050000`, `20260815010000` and `20260816010000`–`20260816030000` applied; Local/Remote history matches
+- Preview: `dpl_3bz2TteXk6384FCkd31MDfwDdx9c` / `https://csms-o6le8j48x-hpstat.vercel.app`, Ready
+- Production: `dpl_3b6buq5af4S9xgsVrKQuKC7HHrbn` / `https://csms-pypectn7i-hpstat.vercel.app`, Ready
+- Production alias: `https://csms-rouge.vercel.app`
+- Frontend rollback target: `dpl_5qe33Qg2mZaFh2BjaTYkjyTdzm5g`
+- `LINE_DELIVERY_ENABLED=false` and `NOTIFICATION_SCHEDULE_ENABLED=false`
+- Disabled worker evidence: LINE claimed 0; missing reminder and pending approval digest each created 0
+- Public smoke: `/`, `/app`, `/app/help`, `/app/submissions`, `/app/dashboard` and `/app/reports` returned HTTP 200
+- Immediate Vercel error/HTTP 500 queries: no logs found
+- Remaining observation: authenticated LIFF/business flows and notification canary require user-session and dedicated-recipient verification
+
+Manual backup checksums — 22 August 2026:
+
+| File | Bytes | SHA-256 |
+|---|---:|---|
+| `roles.sql` | 297 | `25873CEC56A2CC6514E204F420231777F85C03DA818CAA7090CDCDFA89776ECD` |
+| `schema.sql` | 310557 | `D33D17BCCE93220B461566764073C2681E77087134864C048F79F3D2AEE043B2` |
+| `data.sql` | 520144 | `8379E0A43F67680FDBED132B2046AB4330C8046152061A9E51A0F69DB9920F1E` |
 
 ## Readiness snapshot — 8 August 2026
 
