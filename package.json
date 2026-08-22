@@ -19,7 +19,7 @@
     "test:notification-security": "node scripts/notification-security-review.mjs",
     "test:integration": "tsx scripts/frontend-backend.integration.ts",
     "test:full-loop": "tsx scripts/full-loop.integration.ts",
-    "test:edge": "deno test --allow-env supabase/functions/_shared/shared_test.ts supabase/functions/_shared/line_delivery_test.ts supabase/functions/_shared/scheduled_notifications_test.ts",
+    "test:edge": "deno test --config supabase/functions/deno.json --allow-env supabase/functions/_shared/shared_test.ts supabase/functions/_shared/line_delivery_test.ts supabase/functions/_shared/scheduled_notifications_test.ts",
     "preflight:production": "npm run check && npm run test:auth && npm run test:liff-config && npm run test:notification-links && npm run test:line-oa && npm run test:notification-security && npm run build && npm audit --omit=dev --audit-level=high",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
