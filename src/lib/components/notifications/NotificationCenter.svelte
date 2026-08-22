@@ -367,4 +367,8 @@
 
 <style>
   .item-unread { background: linear-gradient(90deg, rgb(240 249 255), white 35%); }
+
+  :global(html[data-mode='dark']) .item-unread {
+    background: linear-gradient(90deg, rgb(7 47 73 / 0.72), rgb(15 23 42 / 0.94) 42%);
+  }
 </style>

@@ -146,6 +146,12 @@ if (
 const submissionPeriod = submissionContext.periods[0];
 const submissionOu = submissionContext.organizationUnits.find((ou) => ou.code === 'GROUP-B')!;
 const requiredMetric = submissionContext.metrics.find((metric) => metric.isRequired)!;
+const originalSubmissionWindow = {
+  submission_opens_at: submissionPeriod.submissionOpensAt,
+  submission_due_at: submissionPeriod.submissionDueAt
+};
+
+try {
 const { error: submissionWindowError } = await serviceClient
   .from('statistic_periods')
   .update({
@@ -408,6 +414,13 @@ if (
   !platformActivity.some((item) => item.action === 'update_platform_tenant')
 ) {
   throw new Error(`Frontend platform invitation/activity integration failed: ${JSON.stringify({ platformInvitations, platformActivity })}`);
+}
+} finally {
+  const { error: restoreSubmissionWindowError } = await serviceClient
+    .from('statistic_periods')
+    .update(originalSubmissionWindow)
+    .eq('id', submissionPeriod.id);
+  if (restoreSubmissionWindowError) throw restoreSubmissionWindowError;
 }
 
 console.log('FRONTEND_BACKEND_INTEGRATION_PASSED');
