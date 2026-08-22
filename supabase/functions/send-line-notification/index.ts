@@ -29,7 +29,10 @@ async function optionalBody(request: Request): Promise<WorkerRequest> {
 }
 
 serve(async (request, headers) => {
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const serviceRoleKey =
+    Deno.env.get("WORKER_SERVICE_ROLE_KEY") ??
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ??
+    "";
   if (!isAuthorizedWorkerRequest(request, serviceRoleKey)) {
     throw new HttpError(
       401,

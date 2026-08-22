@@ -29,7 +29,7 @@ npx supabase login
 npx supabase link --project-ref YOUR_PROJECT_REF
 npx supabase db push --dry-run
 npx supabase db push
-npx supabase secrets set LINE_CHANNEL_ID=YOUR_CHANNEL_ID ALLOWED_ORIGINS=https://YOUR_APP_DOMAIN
+npx supabase secrets set LINE_CHANNEL_ID=YOUR_CHANNEL_ID ALLOWED_ORIGINS=https://YOUR_APP_DOMAIN WORKER_SERVICE_ROLE_KEY=YOUR_CURRENT_SERVICE_ROLE_KEY
 npx supabase secrets set LINE_MESSAGING_CHANNEL_ACCESS_TOKEN=YOUR_TOKEN LINE_MESSAGING_CHANNEL_SECRET=YOUR_SECRET LINE_DELIVERY_ENABLED=false LINE_DELIVERY_CANARY_CHURCH_IDS=YOUR_TEST_TENANT_UUID LINE_DELIVERY_APP_BASE_URL=https://YOUR_APP_DOMAIN/
 npx supabase functions deploy line-auth
 npx supabase functions deploy switch-active-tenant
