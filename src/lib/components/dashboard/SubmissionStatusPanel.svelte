@@ -8,13 +8,13 @@
     : 0;
 </script>
 
-<section class="app-card p-4 sm:p-5" aria-labelledby="submission-status-title">
+<section class="app-card min-w-0 max-w-full overflow-hidden p-4 sm:p-5" aria-labelledby="submission-status-title">
   <div class="flex items-start justify-between gap-4">
-    <div>
+    <div class="min-w-0">
       <h2 id="submission-status-title" class="app-section-title">สถานะการส่งข้อมูล</h2>
       <p class="app-section-copy">หน่วยงานที่คาดว่าจะกรอกข้อมูลในช่วงเวลาที่เลือก</p>
     </div>
-    <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-center">
+    <div class="shrink-0 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-center">
       <p class="text-2xl font-semibold text-emerald-800">{completionPercent}%</p>
       <p class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-emerald-700">complete</p>
     </div>

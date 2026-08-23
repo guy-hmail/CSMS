@@ -189,7 +189,7 @@
   {:else if periods.length > 0}
     {#if summaryEmpty}<section class="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">ยังไม่มีสถิติที่อนุมัติแล้วสำหรับหน่วยงานและสัปดาห์นี้ สถานะการส่งข้อมูลยังแสดงด้านล่าง</section>{/if}
     <KpiSummaryGrid items={kpiSummaries} {selectedMetricCode} onSelectMetric={(code) => void selectMetric(code)} reportHrefForMetric={monthlyReportHref} />
-    <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_23rem]">
+    <div class="grid min-w-0 max-w-full gap-5 xl:grid-cols-[minmax(0,1fr)_23rem]">
       <TrendChartPlaceholder points={trendPoints} metricName={selectedMetricName || 'ตัวชี้วัด'} metrics={kpiSummaries} {selectedMetricCode} loading={trendLoading} onMetricChange={(code) => void selectMetric(code)} />
       <SubmissionStatusPanel summary={submissionSummary} />
     </div>
