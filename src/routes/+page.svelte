@@ -14,6 +14,7 @@
   import { getSupabaseBrowserClient } from '$lib/supabase/browser';
   import { getMyPreferences, listMyTenants } from '$lib/api/identityApi';
   import { extractInviteToken } from '$lib/auth/inviteToken';
+  import { extractSafeAppRedirectPath } from '$lib/auth/liffConfig';
   import {
     exchangeLineSession,
     initializeLiff,
@@ -38,11 +39,6 @@
   let liffClient: Liff | undefined;
   let inviteToken = '';
   let nextPath = '';
-
-  function extractSafeNextPath(search: string): string {
-    const candidate = new URLSearchParams(search).get('next')?.trim() ?? '';
-    return candidate.startsWith('/app/') && !candidate.startsWith('//') ? candidate : '';
-  }
 
   function readableError(error: unknown): string {
     const message = error instanceof Error ? error.message : 'เกิดข้อผิดพลาดระหว่างเข้าสู่ระบบ';
@@ -125,7 +121,7 @@
 
   async function initializeLogin(): Promise<void> {
     try {
-      nextPath = extractSafeNextPath(window.location.search);
+      nextPath = extractSafeAppRedirectPath(window.location.search);
       inviteToken = extractInviteToken(window.location.search);
       const client = getSupabaseBrowserClient();
       const { data: sessionData } = await client.auth.getSession();
@@ -158,7 +154,7 @@
       }
 
       liffClient = await initializeLiff();
-      nextPath = extractSafeNextPath(window.location.search) || nextPath;
+      nextPath = extractSafeAppRedirectPath(window.location.search) || nextPath;
       if (liffClient.isLoggedIn()) {
         await finishLineAuthentication();
       } else {
