@@ -59,13 +59,10 @@
     {#each rows as row}
       <article class="space-y-3 p-4">
         <div class="flex items-start justify-between gap-3">
-          <div>
-            <h3 class="font-medium text-slate-950">{row.ouName}</h3>
-            <p class="mt-1 text-sm text-slate-500">{row.metrics[0]?.metricName ?? 'ไม่มีตัวชี้วัด'} {row.metrics[0]?.value?.toLocaleString() ?? '—'}</p>
-          </div>
+          <h3 class="font-medium text-slate-950">{row.ouName}</h3>
           <StatusBadge label={statusMeta[row.status].label} tone={statusMeta[row.status].tone} />
         </div>
-        {#each row.metrics.slice(1) as metric}<div class="flex items-center justify-between text-sm"><span class="text-slate-500">{metric.metricName}</span><span class="font-medium text-slate-900">{metric.value?.toLocaleString() ?? '—'}</span></div>{/each}
+        {#each row.metrics as metric}<div class="flex items-center justify-between gap-4 text-sm"><span class="text-slate-500">{metric.metricName}</span><span class="shrink-0 text-right font-medium tabular-nums text-slate-900">{metric.value?.toLocaleString() ?? '—'}</span></div>{/each}
         <div class="flex justify-end">
           <button type="button" class="app-button-secondary min-h-0 px-3 py-1.5" on:click={() => onSelectOu(row.ouId)}>ดู Dashboard</button>
         </div>
