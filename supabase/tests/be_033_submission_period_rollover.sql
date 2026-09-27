@@ -68,7 +68,7 @@ reset role;
 select pg_temp.assert_true(
   (select
     jsonb_array_length(response -> 'periods') = 5
-    and response ->> 'defaultPeriodId' = response #>> '{periods,0,id}'
+    and response ->> 'defaultPeriodId' = response #>> '{periods,1,id}'
     and (response #>> '{periods,0,periodEnd}')::date
       = (response #>> '{periods,1,periodEnd}')::date + 7
     and (response #>> '{periods,0,periodStart}')::date
@@ -76,7 +76,7 @@ select pg_temp.assert_true(
     and response #>> '{periods,0,submissionState}' = 'open'
     and (response #>> '{periods,0,submissionOpensAt}')::timestamptz <= now()
    from rollover_context),
-  'submission context moves a pre-created next week earlier and opens it immediately after the previous deadline'
+  'submission context opens the next week early but defaults to the latest completed week'
 );
 
 select pg_temp.assert_true(
