@@ -209,7 +209,7 @@ begin
               'missing:period:%s:ou:%s:window:%s',
               recipient.period_id, (recipient.ou_ids)[1], to_char(local_date, 'YYYY-MM-DD')
             )
-          on conflict (notification_id, channel) do nothing;
+          on conflict on constraint uq_notification_delivery_channel do nothing;
         else
           schedule_event_key := format(
             'missing-digest:period:%s:window:%s',
