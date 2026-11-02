@@ -1,3 +1,4 @@
+import type { CalculationError } from '$lib/reports/metricCalculation';
 export type StatusTone = 'success' | 'warning' | 'info' | 'neutral' | 'error';
 
 export type DashboardOption = {
@@ -10,14 +11,16 @@ export type KpiSummary = {
   metricCode: string;
   metricName: string;
   metricKind: 'input' | 'calculated';
-  value: number;
+  value: number | null;
+  error?: CalculationError;
   unit: string;
   growthPercent: number | null;
 };
 
 export type TrendPoint = {
   label: string;
-  value: number;
+  value: number | null;
+  error?: CalculationError;
 };
 
 export type SubmissionStatusSummary = {
@@ -36,6 +39,7 @@ export type ChildOuSummaryRow = {
     metricName: string;
     metricKind: 'input' | 'calculated';
     value: number | null;
+    error?: CalculationError;
     unit: string;
   }>;
   status: 'approved' | 'missing' | 'submitted' | 'draft' | 'returned' | 'rejected' | 'mixed';

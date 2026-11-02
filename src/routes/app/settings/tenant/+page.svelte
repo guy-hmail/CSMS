@@ -54,7 +54,7 @@
     sortOrder: number;
     active: boolean;
     metricKind: MetricKind;
-    calculationOperator: 'sum' | null;
+    calculationOperator: 'sum' | 'ratio' | null;
     calculationSourceMetricIds: string[];
     dashboardVisible: boolean;
     dashboardOrder: number;
@@ -114,13 +114,18 @@
   let metricSortOrder = 10;
   let metricKind: MetricKind = 'input';
   let metricSourceIds: string[] = [];
+  let metricOperator: 'sum' | 'ratio' = 'sum';
+  let numeratorId = '';
+  let denominatorId = '';
+  $: selectedSourceIds = metricOperator === 'ratio' ? [numeratorId, denominatorId].filter(Boolean) : metricSourceIds;
+  $: invalidCalculation = metricKind === 'calculated' && selectedSourceIds.length < 2;
 
   $: activeOuCount = ouTypes.filter((item) => item.active).length;
   $: activeMetricCount = metrics.filter((item) => item.active).length;
   $: calculationSourceOptions = metrics.filter((item) => item.active && item.metricKind === 'input' && item.dataType === 'number' && item.aggregation === 'sum' && item.id !== editingMetricId);
   $: dashboardMetricOptions = metrics.filter((item) => item.active && item.dataType === 'number' && item.aggregation !== 'none');
   $: selectedDashboardMetricCount = dashboardMetricOptions.filter((item) => item.dashboardVisible).length;
-  $: formulaPreview = metricSourceIds.map((id) => metrics.find((item) => item.id === id)?.name).filter(Boolean).join(' + ');
+  $: formulaPreview = selectedSourceIds.map((id) => metrics.find((item) => item.id === id)?.name).filter(Boolean).join(metricOperator === 'ratio' ? ' ÷ ' : ' + ');
   $: productionLiffId = normalizeLiffId(env.PUBLIC_LINE_LIFF_PRODUCTION_ID || env.PUBLIC_LINE_LIFF_ID);
   $: productionLiffUrl = productionLiffId ? `https://liff.line.me/${productionLiffId}` : '';
   $: productionAppUrl = (env.PUBLIC_PRODUCTION_APP_URL || '').replace(/\/$/, '');
@@ -201,7 +206,7 @@
         sortOrder: item.sort_order,
         active: item.is_active,
         metricKind: item.metric_kind as MetricKind,
-        calculationOperator: item.calculation_operator as 'sum' | null,
+        calculationOperator: item.calculation_operator as 'sum' | 'ratio' | null,
         calculationSourceMetricIds: item.calculation_source_metric_ids ?? [],
         dashboardVisible: item.show_on_dashboard,
         dashboardOrder: item.dashboard_order
@@ -310,6 +315,9 @@
     metricSortOrder = Math.max(0, ...metrics.map((item) => item.sortOrder)) + 10;
     metricKind = 'input';
     metricSourceIds = [];
+    metricOperator = 'sum';
+    numeratorId = '';
+    denominatorId = '';
     metricModalOpen = true;
   }
 
@@ -329,13 +337,16 @@
     metricSortOrder = item.sortOrder;
     metricKind = item.metricKind;
     metricSourceIds = [...item.calculationSourceMetricIds];
+    metricOperator = item.calculationOperator ?? 'sum';
+    numeratorId = metricSourceIds[0] ?? '';
+    denominatorId = metricSourceIds[1] ?? '';
     metricModalOpen = true;
   }
 
   async function saveMetric(): Promise<void> {
     if (!metricName.trim() || !metricCode.trim()) return;
-    if (metricKind === 'calculated' && metricSourceIds.length < 2) {
-      mutationError = 'Calculated Field ต้องเลือก Field ต้นทางอย่างน้อย 2 รายการ';
+    if (invalidCalculation) {
+      mutationError = metricOperator === 'ratio' ? 'กรุณาเลือกตัวตั้ง (A) และตัวหาร (B)' : 'Calculated Field ต้องเลือก Field ต้นทางอย่างน้อย 2 รายการ';
       return;
     }
     const values = {
@@ -362,7 +373,8 @@
           category: values.category,
           unit: values.unit,
           sortOrder: values.sortOrder,
-          sourceMetricIds: metricSourceIds
+          operator: metricOperator,
+          sourceMetricIds: selectedSourceIds
         };
         if (editingMetricId) {
           const current = metrics.find((item) => item.id === editingMetricId);
@@ -413,7 +425,7 @@
       if (item.metricKind === 'calculated') {
         await updateCalculatedMetric(getSupabaseBrowserClient(), id, {
           name: item.name, description: item.description, category: item.category, unit: item.unit,
-          sortOrder: item.sortOrder, sourceMetricIds: item.calculationSourceMetricIds, isActive: !item.active
+          sortOrder: item.sortOrder, operator: item.calculationOperator ?? 'sum', sourceMetricIds: item.calculationSourceMetricIds, isActive: !item.active
         });
       } else {
         await updateStatisticMetric(getSupabaseBrowserClient(), id, {
@@ -473,7 +485,7 @@
     return item.calculationSourceMetricIds
       .map((id) => metrics.find((candidate) => candidate.id === id)?.name)
       .filter((name): name is string => Boolean(name))
-      .join(' + ');
+      .join(item.calculationOperator === 'ratio' ? ' ÷ ' : ' + ');
   }
 
   async function saveGeneralSettings(): Promise<void> {
@@ -747,7 +759,15 @@
           <label><span class="text-sm font-medium text-slate-700">ค่าสูงสุด</span><input class="app-input mt-2" type="number" bind:value={metricMaxValue} disabled={metricDataType !== 'number'} placeholder="ไม่จำกัด" /></label>
         {:else}
           <fieldset class="rounded-2xl border border-violet-200 bg-violet-50/60 p-4 sm:col-span-2">
-            <legend class="px-1 text-sm font-semibold text-violet-950">สูตรผลรวม (SUM)</legend>
+            <legend class="px-1 text-sm font-semibold text-violet-950">สูตรคำนวณ</legend>
+            <label><span class="text-sm font-medium">วิธีคำนวณ</span><select class="app-input mt-2" bind:value={metricOperator}><option value="sum">ผลรวม (A + B)</option><option value="ratio">อัตราส่วน (A ÷ B)</option></select></label>
+            {#if metricOperator === 'ratio'}
+              <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                <label><span class="text-sm font-medium">ตัวตั้ง (A)</span><select class="app-input mt-2" bind:value={numeratorId}><option value="">เลือก Field</option>{#each calculationSourceOptions as source}<option value={source.id}>{source.name}</option>{/each}</select></label>
+                <label><span class="text-sm font-medium">ตัวหาร (B)</span><select class="app-input mt-2" bind:value={denominatorId}><option value="">เลือก Field</option>{#each calculationSourceOptions as source}<option value={source.id}>{source.name}</option>{/each}</select></label>
+              </div>
+              <p class="mt-2 text-xs leading-5 text-violet-800">ผลรวม A ÷ ผลรวม B จากข้อมูลที่อนุมัติแล้ว ปัดเป็นจำนวนเต็ม (เศษตั้งแต่ 0.5 ปัดขึ้น) หากข้อมูลไม่ครบหรือหารด้วยศูนย์ จะแสดง — พร้อมคำอธิบายเมื่อวางเมาส์</p>
+            {:else}
             <p class="mt-1 text-xs leading-5 text-violet-800">เลือก Input Field ตัวเลขอย่างน้อย 2 รายการ ระบบจะคำนวณจากข้อมูลที่อนุมัติแล้วตาม OU และช่วงเวลาของ Report</p>
             <div class="mt-3 grid gap-2 sm:grid-cols-2">
               {#each calculationSourceOptions as source}
@@ -757,6 +777,7 @@
                 </label>
               {/each}
             </div>
+            {/if}
             {#if calculationSourceOptions.length === 0}<p class="mt-3 text-xs text-rose-700">ยังไม่มี Input Field ชนิด number ที่รวมผลแบบ sum สำหรับสร้างสูตร</p>{/if}
             <div class="mt-3 rounded-xl bg-violet-100/70 px-3 py-2 text-xs font-semibold text-violet-900">ตัวอย่างผลลัพธ์: {metricName.trim() || 'Calculated Field'} = {formulaPreview || 'เลือก Field ต้นทาง'}</div>
           </fieldset>
@@ -765,7 +786,7 @@
         <label class={metricKind === 'calculated' ? '' : 'sm:col-span-2'}><span class="text-sm font-medium text-slate-700">คำอธิบาย</span><textarea class="app-input mt-2 min-h-20 resize-y rounded-2xl py-3" bind:value={metricDescription}></textarea>{#if metricKind === 'input'}<span class="mt-1 block text-xs text-slate-500">Input type จะถูกกำหนดจากประเภทข้อมูลอัตโนมัติ: number, text หรือ checkbox</span>{/if}</label>
         {#if metricKind === 'input'}<label class="flex cursor-pointer items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2"><span><span class="block text-sm font-semibold text-slate-900">บังคับกรอก</span><span class="mt-1 block text-xs text-slate-500">ผู้ส่งข้อมูลต้องกรอกก่อนส่งแบบฟอร์ม</span></span><input class="h-5 w-5 accent-sky-600" type="checkbox" bind:checked={metricRequired} /></label>{/if}
       </div>
-      <div class="flex justify-end gap-3 border-t border-slate-100 bg-slate-50/70 p-4 sm:px-5"><button type="button" class="app-button-secondary" disabled={mutationBusy} on:click={() => (metricModalOpen = false)}>ยกเลิก</button><button type="button" class="app-button-primary inline-flex items-center gap-2" disabled={mutationBusy || !metricName.trim() || !metricCode.trim() || (metricKind === 'calculated' && metricSourceIds.length < 2)} on:click={saveMetric}><Save size={16} /> {mutationBusy ? 'กำลังบันทึก...' : 'บันทึก'}</button></div>
+      <div class="flex justify-end gap-3 border-t border-slate-100 bg-slate-50/70 p-4 sm:px-5"><button type="button" class="app-button-secondary" disabled={mutationBusy} on:click={() => (metricModalOpen = false)}>ยกเลิก</button><button type="button" class="app-button-primary inline-flex items-center gap-2" disabled={mutationBusy || !metricName.trim() || !metricCode.trim() || invalidCalculation} on:click={saveMetric}><Save size={16} /> {mutationBusy ? 'กำลังบันทึก...' : 'บันทึก'}</button></div>
     </div>
   </div>
 {/if}

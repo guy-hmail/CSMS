@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { ratioResult, calculationMessage, visibleRatioTotal } from '../src/lib/reports/metricCalculation';
+assert.deepEqual(ratioResult(0, 5), { value: 0, error: null });
+for (const a of [0, 5]) assert.deepEqual(ratioResult(a, 0), { value: null, error: 'DIVISION_BY_ZERO' });
+for (const [a,b] of [[null, 5], [5, null], [undefined, 0], [null, null]]) assert.deepEqual(ratioResult(a,b), { value: null, error: 'MISSING_DATA' });
+assert.equal(ratioResult(5, 2).value, 3);
+assert.equal(ratioResult(7, 3).value, 2);
+assert.equal(ratioResult(-5, 2).value, -3);
+assert.equal(calculationMessage('DIVISION_BY_ZERO'), 'หารด้วยศูนย์ไม่ได้');
+assert.equal(calculationMessage('MISSING_DATA'), 'ข้อมูลไม่ครบ');
+const metric = { metricCode: 'R', sourceMetricCodes: ['A', 'B'] };
+assert.deepEqual(visibleRatioTotal([{ values: { A: 5, B: 2 } }, { values: { A: 1, B: 4 } }], metric), { value: 1, error: null });
+assert.deepEqual(visibleRatioTotal([{ values: { A: 5, B: 0 } }, { values: { A: 1, B: 2 } }], metric), { value: 3, error: null });
+assert.equal(visibleRatioTotal([], metric).error, 'MISSING_DATA');
+assert.equal(visibleRatioTotal([{ values: { A: 1, B: 2 }, errors: { R: 'MISSING_DATA' } }], metric).error, 'MISSING_DATA');
+assert.equal(visibleRatioTotal([{ values: { A: 1, B: null } }], metric).error, 'MISSING_DATA');
+console.log('Ratio calculation tests passed');

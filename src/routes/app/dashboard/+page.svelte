@@ -71,7 +71,7 @@
       const client = getSupabaseBrowserClient();
       const summary = await getRecursiveSummary(client, selectedOuId, selectedPeriodId, comparePeriodId);
       if (version !== requestVersion) return;
-      kpiSummaries = summary.metrics.map((metric) => ({ metricCode: metric.metricCode, metricName: metric.metricName, metricKind: metric.metricKind, value: metric.currentValue ?? 0, unit: metric.unit, growthPercent: metric.growthPercent }));
+      kpiSummaries = summary.metrics.map((metric) => ({ metricCode: metric.metricCode, metricName: metric.metricName, metricKind: metric.metricKind, value: metric.currentValue, error: metric.error, unit: metric.unit, growthPercent: metric.growthPercent }));
       summaryEmpty = summary.metrics.every((metric) => metric.currentValue === null);
       if (!summary.metrics.some((metric) => metric.metricCode === selectedMetricCode)) selectedMetricCode = summary.metrics[0]?.metricCode ?? '';
       selectedMetricName = summary.metrics.find((metric) => metric.metricCode === selectedMetricCode)?.metricName ?? '';
@@ -83,7 +83,7 @@
       if (version !== requestVersion) return;
       submissionSummary = status.summary;
       childOuRows = children.children.map((child) => ({ ouId: child.ouId, ouName: child.ouName, status: child.status, metrics: child.metrics }));
-      trendPoints = (trend?.points ?? []).map((point) => ({ label: shortDate(point.periodEnd), value: point.value }));
+      trendPoints = (trend?.points ?? []).map((point) => ({ label: shortDate(point.periodEnd), value: point.value, error: point.error }));
       selectedMetricName = trend?.metricName ?? selectedMetricName;
       backendStatus = 'live';
     } catch (error) {
@@ -106,7 +106,7 @@
     try {
       const trend = await getDashboardTrend(getSupabaseBrowserClient(), selectedOuId, metricCode, selectedPeriodId, 12);
       if (version !== trendRequestVersion) return;
-      trendPoints = trend.points.map((point) => ({ label: shortDate(point.periodEnd), value: point.value }));
+      trendPoints = trend.points.map((point) => ({ label: shortDate(point.periodEnd), value: point.value, error: point.error }));
       selectedMetricName = trend.metricName;
     } catch (error) {
       if (version !== trendRequestVersion) return;

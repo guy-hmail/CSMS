@@ -1,4 +1,5 @@
 <script lang="ts">
+  import MetricValue from '$lib/components/common/MetricValue.svelte';
   import type { KpiSummary, TrendPoint } from '$lib/types/dashboard';
 
   export let title = 'แนวโน้มรายสัปดาห์';
@@ -9,7 +10,7 @@
   export let onMetricChange: (metricCode: string) => void = () => {};
   export let loading = false;
 
-  $: maxValue = Math.max(...points.map((point) => point.value), 1);
+  $: maxValue = Math.max(...points.map((point) => (point.value ?? 0)), 1);
 
   function changeMetric(event: Event): void {
     onMetricChange((event.currentTarget as HTMLSelectElement).value);
@@ -37,12 +38,12 @@
       {#each points as point}
         <div class="flex h-full min-w-0 flex-1 flex-col justify-end gap-2">
           <div class="flex min-h-0 flex-1 flex-col justify-end">
-            <span class="mb-1 text-center text-xs font-semibold tabular-nums text-slate-700">{point.value.toLocaleString()}</span>
-            <div
+            <span class="mb-1 text-center text-xs font-semibold tabular-nums text-slate-700"><MetricValue value={point.value} error={point.error} /></span>
+            {#if point.value !== null}<div
               class="min-h-1 rounded-t-md bg-gradient-to-t from-sky-700 to-cyan-400 shadow-sm transition hover:from-sky-800 hover:to-cyan-500"
-              style={`height: ${Math.max(2, (point.value / maxValue) * 82)}%`}
-              title={`${point.label}: ${point.value.toLocaleString()}`}
-            ></div>
+              style={`height: ${Math.max(2, ((point.value ?? 0) / maxValue) * 82)}%`}
+              title={`${point.label}: ${point.value?.toLocaleString() ?? '—'}`}
+            ></div>{/if}
           </div>
           <span class="truncate text-center text-[0.68rem] text-slate-500">{point.label}</span>
         </div>
