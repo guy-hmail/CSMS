@@ -1,3 +1,4 @@
+import type { CalculationError } from '$lib/reports/metricCalculation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { callRpc } from './rpc';
 
@@ -9,7 +10,7 @@ export type ReportMetric = {
   unit: string;
   aggregation: 'sum' | 'avg' | 'max' | 'min';
   metricKind: 'input' | 'calculated';
-  calculationOperator: 'sum' | null;
+  calculationOperator: 'sum' | 'ratio' | null;
   sourceMetricCodes: string[];
 };
 
@@ -19,15 +20,16 @@ export type ReportTable = {
   fromDate: string;
   toDate: string;
   metrics: ReportMetric[];
-  rows: Array<{ ouId: string; ouCode: string; ouName: string; values: Record<string, number | null> }>;
+  rows: Array<{ ouId: string; ouCode: string; ouName: string; values: Record<string, number | null>; errors?: Record<string, CalculationError> }>;
   totals: Record<string, number | null>;
+  totalErrors?: Record<string, CalculationError>;
 };
 
 export type ReportTrend = {
   metricCode: string;
   metricName: string;
   unit: string;
-  points: Array<{ periodId: string; label: string; periodStart: string; periodEnd: string; value: number }>;
+  points: Array<{ periodId: string; label: string; periodStart: string; periodEnd: string; value: number | null; error?: CalculationError }>;
 };
 
 export type SubmissionCompleteness = {

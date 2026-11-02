@@ -1,4 +1,5 @@
 <script lang="ts">
+  import MetricValue from '$lib/components/common/MetricValue.svelte';
   import StatusBadge from '$lib/components/common/StatusBadge.svelte';
   import type { ChildOuSummaryRow, StatusTone } from '$lib/types/dashboard';
 
@@ -39,7 +40,7 @@
             <td class="px-4 py-4 font-medium text-slate-950">{row.ouName}</td>
             {#each metricColumns as column}
               {@const metric = row.metrics.find((item) => item.metricCode === column.metricCode)}
-              <td class="px-4 py-4 text-right text-slate-700">{metric?.value?.toLocaleString() ?? '—'}</td>
+              <td class="px-4 py-4 text-right text-slate-700"><MetricValue value={metric?.value} error={metric?.error} /></td>
             {/each}
             <td class="px-4 py-4">
               <StatusBadge label={statusMeta[row.status].label} tone={statusMeta[row.status].tone} />
@@ -62,7 +63,7 @@
           <h3 class="font-medium text-slate-950">{row.ouName}</h3>
           <StatusBadge label={statusMeta[row.status].label} tone={statusMeta[row.status].tone} />
         </div>
-        {#each row.metrics as metric}<div class="flex items-center justify-between gap-4 text-sm"><span class="text-slate-500">{metric.metricName}</span><span class="shrink-0 text-right font-medium tabular-nums text-slate-900">{metric.value?.toLocaleString() ?? '—'}</span></div>{/each}
+        {#each row.metrics as metric}<div class="flex items-center justify-between gap-4 text-sm"><span class="text-slate-500">{metric.metricName}</span><span class="shrink-0 text-right font-medium tabular-nums text-slate-900"><MetricValue value={metric.value} error={metric.error} /></span></div>{/each}
         <div class="flex justify-end">
           <button type="button" class="app-button-secondary min-h-0 px-3 py-1.5" on:click={() => onSelectOu(row.ouId)}>ดู Dashboard</button>
         </div>

@@ -43,6 +43,7 @@ export type StatisticMetricPayload = {
 };
 
 export type CalculatedMetricPayload = {
+  operator?: 'sum' | 'ratio';
   code: string;
   name: string;
   description: string;

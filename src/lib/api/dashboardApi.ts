@@ -1,3 +1,4 @@
+import type { CalculationError } from '$lib/reports/metricCalculation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { callRpc } from './rpc';
 
@@ -10,6 +11,7 @@ export type RecursiveSummaryMetric = {
   aggregation: string;
   metricKind: 'input' | 'calculated';
   currentValue: number | null;
+  error?: CalculationError;
   compareValue: number | null;
   growthPercent: number | null;
 };
@@ -34,7 +36,7 @@ export type ChildOuSummaryResult = {
     status: 'approved' | 'missing' | 'submitted' | 'draft' | 'returned' | 'rejected' | 'mixed';
     expectedCount: number;
     approvedCount: number;
-    metrics: Array<{ metricCode: string; metricName: string; metricKind: 'input' | 'calculated'; unit: string; value: number | null }>;
+    metrics: Array<{ metricCode: string; metricName: string; metricKind: 'input' | 'calculated'; unit: string; value: number | null; error?: CalculationError }>;
   }>;
 };
 
@@ -43,7 +45,7 @@ export type DashboardTrend = {
   metricName: string;
   metricKind: 'input' | 'calculated';
   unit: string;
-  points: Array<{ periodId: string; label: string; periodStart: string; periodEnd: string; value: number }>;
+  points: Array<{ periodId: string; label: string; periodStart: string; periodEnd: string; value: number | null; error?: CalculationError }>;
 };
 
 export function getRecursiveSummary(

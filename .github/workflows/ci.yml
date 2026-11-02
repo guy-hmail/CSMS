@@ -25,6 +25,7 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run test:auth
+      - run: npm run test:metric-calculation
       - run: npm run test:liff-config
       - run: npm run test:notification-links
       - run: npm run test:line-oa
