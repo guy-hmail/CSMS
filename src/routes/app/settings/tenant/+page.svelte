@@ -358,7 +358,7 @@
     for (const [label, value, limit] of [
       ['ชื่อแสดงผล', metricName, 255], ['หมวดหมู่', metricCategory, 80], ['หน่วย', metricUnit, 50]
     ] as const) {
-      if (!value.trim() || [...value.trim()].length > limit) {
+      if ((label !== 'หน่วย' || metricKind !== 'calculated' || metricOperator !== 'ratio') && (!value.trim() || [...value.trim()].length > limit)) {
         mutationError = `กรุณากรอก${label} ไม่เกิน ${limit} ตัวอักษร`;
         return;
       }
@@ -375,7 +375,7 @@
       name: metricName.trim(),
       description: metricDescription.trim(),
       category: metricCategory.trim().toLowerCase(),
-      unit: metricUnit.trim(),
+      unit: metricKind === 'calculated' && metricOperator === 'ratio' ? '%' : metricUnit.trim(),
       dataType: metricDataType,
       aggregation: metricDataType === 'number' ? metricAggregation : 'none' as Aggregation,
       defaultValue: metricDataType === 'number' ? metricDefaultValue : null,
@@ -507,7 +507,7 @@
   function formatFormula(ids: string[], fields: MetricSetting[], operator: 'sum' | 'ratio' | null, split: number): string {
     const names = ids.map(id => fields.find(field => field.id === id)?.name ?? '?');
     if (operator !== 'ratio') return names.join(' + ');
-    return `(${names.slice(0, split).join(' + ') || 'A'}) ÷ (${names.slice(split).join(' + ') || 'B'})`;
+    return `[(${names.slice(0, split).join(' + ') || 'A'}) ÷ (${names.slice(split).join(' + ') || 'B'}) ] × 100`;
   }
 
   async function saveGeneralSettings(): Promise<void> {
@@ -772,7 +772,7 @@
         <label><span class="text-sm font-medium text-slate-700">ชื่อแสดงผล</span><input class="app-input mt-2" bind:value={metricName} placeholder="เช่น ผู้ใหญ่มาคจ." /></label>
         <label><span class="text-sm font-medium text-slate-700">Metric Code</span><input class="app-input mt-2 uppercase" bind:value={metricCode} disabled={editingMetricId !== null} placeholder="ATTENDANCE" /></label>
         <label><span class="text-sm font-medium text-slate-700">หมวดหมู่</span><input class="app-input mt-2" bind:value={metricCategory} placeholder="attendance" /></label>
-        <label><span class="text-sm font-medium text-slate-700">หน่วย</span><input class="app-input mt-2" bind:value={metricUnit} placeholder="คน" /></label>
+        <label><span class="text-sm font-medium text-slate-700">หน่วย</span><input class="app-input mt-2" value={metricKind === 'calculated' && metricOperator === 'ratio' ? '%' : metricUnit} on:input={(event) => (metricUnit = event.currentTarget.value)} readonly={metricKind === 'calculated' && metricOperator === 'ratio'} placeholder="คน" /></label>
         {#if metricKind === 'input'}
           <label><span class="text-sm font-medium text-slate-700">ประเภทข้อมูล</span><select class="app-input mt-2" bind:value={metricDataType} disabled={editingMetricId !== null}><option value="number">จำนวน (number)</option><option value="text">ข้อความ (text)</option><option value="boolean">ใช่/ไม่ใช่ (boolean)</option></select></label>
           <label><span class="text-sm font-medium text-slate-700">วิธีรวมผล</span><select class="app-input mt-2" bind:value={metricAggregation} disabled={metricDataType !== 'number'}><option value="sum">ผลรวม (sum)</option><option value="avg">ค่าเฉลี่ย (avg)</option><option value="max">ค่าสูงสุด (max)</option><option value="min">ค่าต่ำสุด (min)</option><option value="none">ไม่รวมผล (none)</option></select></label>
@@ -798,7 +798,7 @@
                   {/each}
                 </fieldset>
               </div>
-              <p class="mt-2 text-xs leading-5 text-violet-800">ผลรวม A ÷ ผลรวม B จากข้อมูลที่อนุมัติแล้ว ปัดเป็นจำนวนเต็ม (เศษตั้งแต่ 0.5 ปัดขึ้น) ฟิลด์ที่ว่างจะข้ามไป หากรายการที่อนุมัติขาดข้อมูลทั้งฝั่ง A หรือ B หรือยอดรวม B เป็นศูนย์ จะแสดง — พร้อมคำอธิบายเมื่อวางเมาส์</p>
+              <p class="mt-2 text-xs leading-5 text-violet-800">(ผลรวม A ÷ ผลรวม B) × 100 จากข้อมูลที่อนุมัติแล้ว แสดงเปอร์เซ็นต์ ทศนิยม 2 ตำแหน่ง ฟิลด์ที่ว่างจะข้ามไป หากรายการที่อนุมัติขาดข้อมูลทั้งฝั่ง A หรือ B หรือยอดรวม B เป็นศูนย์ จะแสดง — พร้อมคำอธิบายเมื่อวางเมาส์</p>
             {:else}
             <p class="mt-1 text-xs leading-5 text-violet-800">เลือก Input Field ตัวเลขอย่างน้อย 2 รายการ ระบบจะคำนวณจากข้อมูลที่อนุมัติแล้วตาม OU และช่วงเวลาของ Report</p>
             <div class="mt-3 grid gap-2 sm:grid-cols-2">

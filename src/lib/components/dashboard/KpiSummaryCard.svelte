@@ -18,7 +18,7 @@
     <button type="button" class="min-w-0 flex-1 text-left" aria-pressed={selected} on:click={onSelect}>
       <div class="flex items-center gap-2"><p class="truncate text-sm font-medium text-slate-600">{item.metricName}</p>{#if item.metricKind === 'calculated'}<span class="shrink-0 rounded-full bg-violet-50 px-2 py-0.5 text-[0.62rem] font-semibold text-violet-700">Calculated</span>{/if}</div>
       <p class="mt-2 flex items-baseline gap-1.5 text-2xl font-semibold tracking-tight text-slate-950 sm:text-[1.75rem]">
-        <span><MetricValue value={item.value} error={item.error} /></span><span class="text-xs font-medium text-slate-500">{item.unit}</span>
+        <span><MetricValue value={item.value} error={item.error} unit={item.unit} /></span><span class="text-xs font-medium text-slate-500">{item.unit}</span>
       </p>
       <p class={`mt-2 flex items-center gap-1 text-xs font-medium ${trendTone}`}>
         {#if item.growthPercent === null || item.growthPercent === 0}

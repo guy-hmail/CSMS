@@ -30,11 +30,11 @@ set local role authenticated;
 create function pg_temp.report() returns jsonb language sql as $$
  select public.get_report_table('84000000-0000-4000-8000-000000000004','2026-07-26','2026-07-26')->'data';
 $$;
-select pg_temp.assert_true((pg_temp.report() #>> '{totals,ATTENDANCE_PER_CARE}')::numeric=10, '95 divided by 10 rounds to 10');
+select pg_temp.assert_true((pg_temp.report() #>> '{totals,ATTENDANCE_PER_CARE}')::numeric=950, '95 divided by 10 is 950 percent');
 select pg_temp.assert_true(exists(select 1 from jsonb_array_elements(pg_temp.report()->'metrics') m
  where m->>'metricCode'='ATTENDANCE_PER_CARE' and (m->>'numeratorCount')::integer=4 and jsonb_array_length(m->'sourceMetricCodes')=6), 'report exposes both groups');
 select public.update_calculated_metric(jsonb_build_object('metricId',(select id from grouped_ratio),'numeratorCount',3));
-select pg_temp.assert_true((pg_temp.report() #>> '{totals,ATTENDANCE_PER_CARE}')::numeric=6, 'edited split evaluates 90 divided by 15');
+select pg_temp.assert_true((pg_temp.report() #>> '{totals,ATTENDANCE_PER_CARE}')::numeric=600, 'edited split evaluates 90 divided by 15');
 reset role;
 update public.statistic_values set numeric_value=0 where submission_id='89000000-0000-4000-8000-000000000002'
  and metric_id in ('87000000-0000-4000-8000-000000000010','87000000-0000-4000-8000-000000000011','87000000-0000-4000-8000-000000000012');
@@ -49,7 +49,7 @@ update public.statistic_values set numeric_value = case
  and metric_id in ('87000000-0000-4000-8000-000000000001','87000000-0000-4000-8000-000000000009','87000000-0000-4000-8000-000000000010','87000000-0000-4000-8000-000000000011');
 delete from public.statistic_values where submission_id='89000000-0000-4000-8000-000000000002'
  and metric_id='87000000-0000-4000-8000-000000000012';
-select pg_temp.assert_true((pg_temp.report() #>> '{totals,ATTENDANCE_PER_CARE}')::numeric=1, '8 / 7 rounds to 1 despite missing siblings');
+select pg_temp.assert_true((pg_temp.report() #>> '{totals,ATTENDANCE_PER_CARE}')::numeric=114.29, '8 / 7 is 114.29 percent despite missing siblings');
 delete from public.statistic_values where submission_id='89000000-0000-4000-8000-000000000002'
  and metric_id in ('87000000-0000-4000-8000-000000000010','87000000-0000-4000-8000-000000000011');
 select pg_temp.assert_true(pg_temp.report() #>> '{totalErrors,ATTENDANCE_PER_CARE}'='MISSING_DATA', 'entire denominator missing');

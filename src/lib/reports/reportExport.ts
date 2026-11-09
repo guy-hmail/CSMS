@@ -87,7 +87,8 @@ export function exportCsv(metadata: ExportMetadata, rows: ExportRow[]): void {
     ['Matrix Metrics', String(metadata.metrics.length)],
     ['Generated At', metadata.generatedAt]
   ];
-  const detailRows = rows.map((row) => exportDetailRow(metadata, row));
+  const detailRows = rows.map((row) => exportDetailRow(metadata, row).map((value, index) =>
+    typeof value === 'number' && metadata.metrics[index - 2]?.unit === '%' ? value.toFixed(2) : value));
   const csv = [...metadataRows, [], exportColumns(metadata), ...detailRows]
     .map((row) => row.map(escapeCsv).join(','))
     .join('\r\n');
@@ -107,7 +108,8 @@ export async function exportExcel(metadata: ExportMetadata, rows: ExportRow[]): 
   ];
   const detail = [
     exportColumns(metadata).map(header),
-    ...rows.map((row) => exportDetailRow(metadata, row))
+    ...rows.map((row) => exportDetailRow(metadata, row).map((value, index) =>
+      typeof value === 'number' && metadata.metrics[index - 2]?.unit === '%' ? { value, type: Number, format: '0.00' } : value))
   ];
   const detailColumns = [
     { width: 16 },
@@ -165,7 +167,7 @@ export async function exportPdf(metadata: ExportMetadata, rows: ExportRow[]): Pr
       if (rowIndex % 2) { context.fillStyle = '#f8fafc'; context.fillRect(70, y, 1100, 48); }
       context.fillStyle = '#1e293b';
       x = 70;
-      const values = [row.ouCode, row.ouName, row.values[metadata.selectedMetricCode] ?? '—', row.expected, row.submitted, row.approved, row.missing];
+      const values = [row.ouCode, row.ouName, (metadata.unit === '%' ? row.values[metadata.selectedMetricCode]?.toFixed(2) : row.values[metadata.selectedMetricCode]) ?? '—', row.expected, row.submitted, row.approved, row.missing];
       values.forEach((value, index) => { context.fillText(String(value), x + 10, y + 31, widths[index] - 20); x += widths[index]; });
       y += 48;
     });

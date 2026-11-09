@@ -11,8 +11,9 @@ export function calculationMessage(error?: CalculationError): string | undefined
 export function ratioResult(a: number | null | undefined, b: number | null | undefined): CalculationResult {
   if (a == null || b == null) return { value: null, error: 'MISSING_DATA' };
   if (b === 0) return { value: null, error: 'DIVISION_BY_ZERO' };
-  const quotient = a / b;
-  return { value: Math.sign(quotient) * Math.round(Math.abs(quotient)) || 0, error: null };
+  const scaled = Math.abs(a / b) * 10000;
+  const value = Math.sign(a / b) * Math.round(scaled + Number.EPSILON * scaled) / 100;
+  return { value: value || 0, error: null };
 }
 
 export function visibleRatioTotal(
