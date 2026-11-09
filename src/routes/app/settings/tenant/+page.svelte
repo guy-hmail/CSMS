@@ -302,6 +302,7 @@
   }
 
   function openCreateMetric(): void {
+    mutationError = '';
     editingMetricId = null;
     metricName = '';
     metricCode = '';
@@ -324,6 +325,7 @@
   }
 
   function openEditMetric(item: MetricSetting): void {
+    mutationError = '';
     editingMetricId = item.id;
     metricName = item.name;
     metricCode = item.code;
@@ -346,7 +348,25 @@
   }
 
   async function saveMetric(): Promise<void> {
-    if (!metricName.trim() || !metricCode.trim()) return;
+    // Remove invisible formatting sometimes included in pasted metric codes.
+    const code = metricCode.replace(/[\u200B-\u200D\uFEFF]/g, '').trim().toUpperCase();
+    if (!editingMetricId) metricCode = code;
+    if (!editingMetricId && !/^[A-Z][A-Z0-9_]{0,79}$/.test(code)) {
+      mutationError = 'Metric Code ต้องขึ้นต้นด้วย A–Z ใช้ได้เฉพาะ A–Z, 0–9 และ _ รวมไม่เกิน 80 ตัวอักษร';
+      return;
+    }
+    for (const [label, value, limit] of [
+      ['ชื่อแสดงผล', metricName, 255], ['หมวดหมู่', metricCategory, 80], ['หน่วย', metricUnit, 50]
+    ] as const) {
+      if (!value.trim() || [...value.trim()].length > limit) {
+        mutationError = `กรุณากรอก${label} ไม่เกิน ${limit} ตัวอักษร`;
+        return;
+      }
+    }
+    if (!Number.isInteger(metricSortOrder) || metricSortOrder < 0 || metricSortOrder > 2147483647) {
+      mutationError = 'ลำดับแสดงผลต้องเป็นจำนวนเต็มตั้งแต่ 0 ถึง 2147483647';
+      return;
+    }
     if (invalidCalculation) {
       mutationError = metricOperator === 'ratio' ? 'กรุณาเลือกตัวตั้ง (A) และตัวหาร (B)' : 'Calculated Field ต้องเลือก Field ต้นทางอย่างน้อย 2 รายการ';
       return;
@@ -384,7 +404,7 @@
           await updateCalculatedMetric(client, editingMetricId, { ...calculatedValues, isActive: current?.active ?? true });
           toastMessage = `แก้ไข Calculated Field “${metricName.trim()}” แล้ว`;
         } else {
-          await createCalculatedMetric(client, { code: metricCode.trim().toUpperCase(), ...calculatedValues });
+          await createCalculatedMetric(client, { code, ...calculatedValues });
           toastMessage = `เพิ่ม Calculated Field “${metricName.trim()}” แล้ว`;
         }
       } else if (editingMetricId) {
@@ -405,7 +425,7 @@
         toastMessage = `แก้ไข Field “${metricName.trim()}” แล้ว`;
       } else {
         await createStatisticMetric(client, {
-          code: metricCode.trim().toUpperCase(),
+          code,
           ...values
         });
         toastMessage = `เพิ่ม Field “${metricName.trim()}” แล้ว`;
@@ -560,7 +580,7 @@
   {:else}
     <p class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-800">เชื่อมต่อ Tenant Settings API แล้ว การเปลี่ยนแปลงจะบันทึกลงฐานข้อมูลของ {$tenantContext.activeTenant?.name} และสร้าง Audit Log</p>
   {/if}
-  {#if mutationError}
+  {#if mutationError && !metricModalOpen}
     <p class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert">{mutationError}</p>
   {/if}
   <section class="app-card relative overflow-hidden p-4 sm:p-5 lg:p-6" aria-labelledby="tenant-settings-title">
@@ -798,7 +818,10 @@
         <label class={metricKind === 'calculated' ? '' : 'sm:col-span-2'}><span class="text-sm font-medium text-slate-700">คำอธิบาย</span><textarea class="app-input mt-2 min-h-20 resize-y rounded-2xl py-3" bind:value={metricDescription}></textarea>{#if metricKind === 'input'}<span class="mt-1 block text-xs text-slate-500">Input type จะถูกกำหนดจากประเภทข้อมูลอัตโนมัติ: number, text หรือ checkbox</span>{/if}</label>
         {#if metricKind === 'input'}<label class="flex cursor-pointer items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:col-span-2"><span><span class="block text-sm font-semibold text-slate-900">บังคับกรอก</span><span class="mt-1 block text-xs text-slate-500">ผู้ส่งข้อมูลต้องกรอกก่อนส่งแบบฟอร์ม</span></span><input class="h-5 w-5 accent-sky-600" type="checkbox" bind:checked={metricRequired} /></label>{/if}
       </div>
-      <div class="flex justify-end gap-3 border-t border-slate-100 bg-slate-50/70 p-4 sm:px-5"><button type="button" class="app-button-secondary" disabled={mutationBusy} on:click={() => (metricModalOpen = false)}>ยกเลิก</button><button type="button" class="app-button-primary inline-flex items-center gap-2" disabled={mutationBusy || !metricName.trim() || !metricCode.trim() || invalidCalculation} on:click={saveMetric}><Save size={16} /> {mutationBusy ? 'กำลังบันทึก...' : 'บันทึก'}</button></div>
+      {#if mutationError}
+        <p class="border-t border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">{mutationError}</p>
+      {/if}
+      <div class="flex justify-end gap-3 border-t border-slate-100 bg-slate-50/70 p-4 sm:px-5"><button type="button" class="app-button-secondary" disabled={mutationBusy} on:click={() => (metricModalOpen = false)}>ยกเลิก</button><button type="button" class="app-button-primary inline-flex items-center gap-2" disabled={mutationBusy} on:click={saveMetric}><Save size={16} /> {mutationBusy ? 'กำลังบันทึก...' : 'บันทึก'}</button></div>
     </div>
   </div>
 {/if}
