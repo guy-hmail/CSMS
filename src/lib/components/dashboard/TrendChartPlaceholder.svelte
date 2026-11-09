@@ -38,7 +38,7 @@
       {#each points as point}
         <div class="flex h-full min-w-0 flex-1 flex-col justify-end gap-2">
           <div class="flex min-h-0 flex-1 flex-col justify-end">
-            <span class="mb-1 text-center text-xs font-semibold tabular-nums text-slate-700"><MetricValue value={point.value} error={point.error} /></span>
+            <span class="mb-1 text-center text-xs font-semibold tabular-nums text-slate-700"><MetricValue value={point.value} error={point.error} unit={metrics.find(metric => metric.metricCode === selectedMetricCode)?.unit} /></span>
             {#if point.value !== null}<div
               class="min-h-1 rounded-t-md bg-gradient-to-t from-sky-700 to-cyan-400 shadow-sm transition hover:from-sky-800 hover:to-cyan-500"
               style={`height: ${Math.max(2, ((point.value ?? 0) / maxValue) * 82)}%`}

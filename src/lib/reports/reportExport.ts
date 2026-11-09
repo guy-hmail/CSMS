@@ -87,7 +87,8 @@ export function exportCsv(metadata: ExportMetadata, rows: ExportRow[]): void {
     ['Matrix Metrics', String(metadata.metrics.length)],
     ['Generated At', metadata.generatedAt]
   ];
-  const detailRows = rows.map((row) => exportDetailRow(metadata, row));
+  const detailRows = rows.map((row) => exportDetailRow(metadata, row).map((value, index) =>
+    typeof value === 'number' && metadata.metrics[index - 2]?.unit === '%' ? value.toFixed(2) : value));
   const csv = [...metadataRows, [], exportColumns(metadata), ...detailRows]
     .map((row) => row.map(escapeCsv).join(','))
     .join('\r\n');
@@ -107,7 +108,8 @@ export async function exportExcel(metadata: ExportMetadata, rows: ExportRow[]): 
   ];
   const detail = [
     exportColumns(metadata).map(header),
-    ...rows.map((row) => exportDetailRow(metadata, row))
+    ...rows.map((row) => exportDetailRow(metadata, row).map((value, index) =>
+      typeof value === 'number' && metadata.metrics[index - 2]?.unit === '%' ? { value, type: Number, format: '0.00' } : value))
   ];
   const detailColumns = [
     { width: 16 },
