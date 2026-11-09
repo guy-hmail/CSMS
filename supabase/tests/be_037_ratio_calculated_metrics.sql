@@ -27,9 +27,10 @@ where id in (
 select pg_temp.assert_true(app_security.ratio_result(0, 5) = '{"value":0,"error":null}'::jsonb, 'zero numerator is a valid zero');
 select pg_temp.assert_true(app_security.ratio_result(0, 0) = '{"value":null,"error":"DIVISION_BY_ZERO"}'::jsonb, 'zero over zero is undefined');
 select pg_temp.assert_true(app_security.ratio_result(null, 0) ->> 'error' = 'MISSING_DATA', 'missing data takes precedence');
-select pg_temp.assert_true((app_security.ratio_result(5, 2) ->> 'value')::numeric = 250, 'half rounds up');
-select pg_temp.assert_true((app_security.ratio_result(7, 3) ->> 'value')::numeric = 233.33, 'fraction below half rounds down');
-select pg_temp.assert_true((app_security.ratio_result(-5, 2) ->> 'value')::numeric = -250, 'negative half rounds away from zero');
+select pg_temp.assert_true((app_security.ratio_result(5, 2) ->> 'value')::numeric = 250, '5 divided by 2 is 250 percent');
+select pg_temp.assert_true((app_security.ratio_result(7, 3) ->> 'value')::numeric = 233.33, '7 divided by 3 is 233.33 percent');
+select pg_temp.assert_true((app_security.ratio_result(-5, 2) ->> 'value')::numeric = -250, 'negative ratio remains negative');
+select pg_temp.assert_true((app_security.ratio_result(1,32)->>'value')::numeric=3.13, 'percentage rounds after multiplying by 100');
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '80000000-0000-4000-8000-000000000002', true);
 select set_config('request.jwt.claims', '{"sub":"80000000-0000-4000-8000-000000000002","app_metadata":{"active_church_id":"81000000-0000-4000-8000-000000000001"}}', true);
@@ -79,7 +80,7 @@ begin
  end loop;
 end $$;
 
--- The combined ratio is 6 / 6 = 1, not the sum of rounded row ratios (3 + 0).
+-- Sum operands before computing percentage. 6 / 6 is 100 percent.
 update public.statistic_values set numeric_value = case when metric_id = '87000000-0000-4000-8000-000000000008' then 1 else 4 end
 where submission_id = '89000000-0000-4000-8000-000000000003' and metric_id in ('87000000-0000-4000-8000-000000000008','87000000-0000-4000-8000-000000000001');
 select pg_temp.assert_true((public.get_report_table('84000000-0000-4000-8000-000000000001', '2026-07-26', '2026-07-26') #>> '{data,totals,TEST_RATIO}')::numeric = 100, 'ratio of sums, rounded once');

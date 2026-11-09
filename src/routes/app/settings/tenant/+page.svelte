@@ -507,7 +507,7 @@
   function formatFormula(ids: string[], fields: MetricSetting[], operator: 'sum' | 'ratio' | null, split: number): string {
     const names = ids.map(id => fields.find(field => field.id === id)?.name ?? '?');
     if (operator !== 'ratio') return names.join(' + ');
-    return `[(${names.slice(0, split).join(' + ') || 'A'}) ÷ (${names.slice(split).join(' + ') || 'B'})] × 100%`;
+    return `[(${names.slice(0, split).join(' + ') || 'A'}) ÷ (${names.slice(split).join(' + ') || 'B'}) ] × 100`;
   }
 
   async function saveGeneralSettings(): Promise<void> {

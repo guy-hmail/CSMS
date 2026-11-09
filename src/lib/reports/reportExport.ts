@@ -167,7 +167,7 @@ export async function exportPdf(metadata: ExportMetadata, rows: ExportRow[]): Pr
       if (rowIndex % 2) { context.fillStyle = '#f8fafc'; context.fillRect(70, y, 1100, 48); }
       context.fillStyle = '#1e293b';
       x = 70;
-      const values = [row.ouCode, row.ouName, row.values[metadata.selectedMetricCode] ?? '—', row.expected, row.submitted, row.approved, row.missing];
+      const values = [row.ouCode, row.ouName, (metadata.unit === '%' ? row.values[metadata.selectedMetricCode]?.toFixed(2) : row.values[metadata.selectedMetricCode]) ?? '—', row.expected, row.submitted, row.approved, row.missing];
       values.forEach((value, index) => { context.fillText(String(value), x + 10, y + 31, widths[index] - 20); x += widths[index]; });
       y += 48;
     });
