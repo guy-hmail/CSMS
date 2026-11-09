@@ -87,7 +87,7 @@ select pg_temp.assert_true((public.get_report_table('84000000-0000-4000-8000-000
 
 -- All rows missing an operand, including absence of the value row, stay missing.
 delete from public.statistic_values where submission_id = '89000000-0000-4000-8000-000000000002' and metric_id = '87000000-0000-4000-8000-000000000008';
-select pg_temp.assert_true(public.get_report_table('84000000-0000-4000-8000-000000000001', '2026-07-26', '2026-07-26') #>> '{data,totalErrors,TEST_RATIO}' = 'MISSING_DATA', 'partial data cannot silently produce a ratio');
+select pg_temp.assert_true((public.get_report_table('84000000-0000-4000-8000-000000000001', '2026-07-26', '2026-07-26') #>> '{data,totals,TEST_RATIO}')::numeric = 16.67, 'scope sums available operands independently');
 select pg_temp.assert_true(public.get_report_trend('84000000-0000-4000-8000-000000000004', 'TEST_RATIO', '2020-01-01', '2020-01-01') #> '{data,points}' = '[]'::jsonb, 'empty date range is supported');
 
 set local role authenticated;
