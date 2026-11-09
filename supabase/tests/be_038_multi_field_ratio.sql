@@ -40,6 +40,18 @@ update public.statistic_values set numeric_value=0 where submission_id='89000000
  and metric_id in ('87000000-0000-4000-8000-000000000010','87000000-0000-4000-8000-000000000011','87000000-0000-4000-8000-000000000012');
 select pg_temp.assert_true(pg_temp.report() #>> '{totalErrors,ATTENDANCE_PER_CARE}'='DIVISION_BY_ZERO', 'all denominator fields zero');
 delete from public.statistic_values where submission_id='89000000-0000-4000-8000-000000000002' and metric_id='87000000-0000-4000-8000-000000000008';
-select pg_temp.assert_true(pg_temp.report() #>> '{totalErrors,ATTENDANCE_PER_CARE}'='MISSING_DATA', 'one missing operand takes precedence');
+select pg_temp.assert_true(pg_temp.report() #>> '{totalErrors,ATTENDANCE_PER_CARE}'='DIVISION_BY_ZERO', 'partial numerator still allows detecting zero denominator');
+-- The production PG example: a missing sibling on either side is skipped.
+update public.statistic_values set numeric_value = case
+ when metric_id = '87000000-0000-4000-8000-000000000001' then 8
+ when metric_id = '87000000-0000-4000-8000-000000000011' then 7 else 0 end
+ where submission_id='89000000-0000-4000-8000-000000000002'
+ and metric_id in ('87000000-0000-4000-8000-000000000001','87000000-0000-4000-8000-000000000009','87000000-0000-4000-8000-000000000010','87000000-0000-4000-8000-000000000011');
+delete from public.statistic_values where submission_id='89000000-0000-4000-8000-000000000002'
+ and metric_id='87000000-0000-4000-8000-000000000012';
+select pg_temp.assert_true((pg_temp.report() #>> '{totals,ATTENDANCE_PER_CARE}')::numeric=1, '8 / 7 rounds to 1 despite missing siblings');
+delete from public.statistic_values where submission_id='89000000-0000-4000-8000-000000000002'
+ and metric_id in ('87000000-0000-4000-8000-000000000010','87000000-0000-4000-8000-000000000011');
+select pg_temp.assert_true(pg_temp.report() #>> '{totalErrors,ATTENDANCE_PER_CARE}'='MISSING_DATA', 'entire denominator missing');
 select 'ok 1 - Grouped ratio operands';
 rollback;
