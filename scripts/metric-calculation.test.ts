@@ -17,6 +17,8 @@ assert.equal(visibleRatioTotal([{ values: { A: 1, B: null } }], metric).error, '
 const grouped = { metricCode: 'R', numeratorCount: 4, sourceMetricCodes: ['A1','A2','A3','A4','B1','B2'] };
 const inputs = { A1: 60, A2: 20, A3: 10, A4: 5, B1: 7, B2: 3 };
 assert.deepEqual(visibleRatioTotal([{ values: inputs }], grouped), { value: 10, error: null });
-assert.equal(visibleRatioTotal([{ values: { ...inputs, A4: null } }], grouped).error, 'MISSING_DATA');
+assert.deepEqual(visibleRatioTotal([{ values: { ...inputs, A4: null } }], grouped), { value: 9, error: null });
+const pg = { metricCode: 'R', numeratorCount: 2, sourceMetricCodes: ['CARE_MEETING', 'CARE_ONLINE', 'ATTENDANCE', 'ONLINE'] };
+assert.deepEqual(visibleRatioTotal([{ values: { CARE_MEETING: null, CARE_ONLINE: 8, ATTENDANCE: 7, ONLINE: null } }], pg), { value: 1, error: null });
 assert.equal(visibleRatioTotal([{ values: { ...inputs, B1: 0, B2: 0 } }], grouped).error, 'DIVISION_BY_ZERO');
 console.log('Ratio calculation tests passed');
