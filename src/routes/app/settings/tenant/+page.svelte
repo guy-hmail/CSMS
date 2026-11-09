@@ -56,6 +56,7 @@
     metricKind: MetricKind;
     calculationOperator: 'sum' | 'ratio' | null;
     calculationSourceMetricIds: string[];
+    numeratorCount: number;
     dashboardVisible: boolean;
     dashboardOrder: number;
   };
@@ -115,17 +116,17 @@
   let metricKind: MetricKind = 'input';
   let metricSourceIds: string[] = [];
   let metricOperator: 'sum' | 'ratio' = 'sum';
-  let numeratorId = '';
-  let denominatorId = '';
-  $: selectedSourceIds = metricOperator === 'ratio' ? [numeratorId, denominatorId].filter(Boolean) : metricSourceIds;
-  $: invalidCalculation = metricKind === 'calculated' && selectedSourceIds.length < 2;
+  let numeratorIds: string[] = [];
+  let denominatorIds: string[] = [];
+  $: selectedSourceIds = metricOperator === 'ratio' ? [...numeratorIds, ...denominatorIds] : metricSourceIds;
+  $: invalidCalculation = metricKind === 'calculated' && (metricOperator === 'ratio' ? !numeratorIds.length || !denominatorIds.length : metricSourceIds.length < 2);
 
   $: activeOuCount = ouTypes.filter((item) => item.active).length;
   $: activeMetricCount = metrics.filter((item) => item.active).length;
   $: calculationSourceOptions = metrics.filter((item) => item.active && item.metricKind === 'input' && item.dataType === 'number' && item.aggregation === 'sum' && item.id !== editingMetricId);
   $: dashboardMetricOptions = metrics.filter((item) => item.active && item.dataType === 'number' && item.aggregation !== 'none');
   $: selectedDashboardMetricCount = dashboardMetricOptions.filter((item) => item.dashboardVisible).length;
-  $: formulaPreview = selectedSourceIds.map((id) => metrics.find((item) => item.id === id)?.name).filter(Boolean).join(metricOperator === 'ratio' ? ' ÷ ' : ' + ');
+  $: formulaPreview = formatFormula(selectedSourceIds, metrics, metricOperator, numeratorIds.length);
   $: productionLiffId = normalizeLiffId(env.PUBLIC_LINE_LIFF_PRODUCTION_ID || env.PUBLIC_LINE_LIFF_ID);
   $: productionLiffUrl = productionLiffId ? `https://liff.line.me/${productionLiffId}` : '';
   $: productionAppUrl = (env.PUBLIC_PRODUCTION_APP_URL || '').replace(/\/$/, '');
@@ -149,7 +150,7 @@
           .select('ou_type_id,name,parent_id,level'),
         client
           .from('statistic_metrics')
-          .select('id,code,name,description,category,unit,data_type,input_type,aggregation,default_value,is_required,min_value,max_value,sort_order,is_active,metric_kind,calculation_operator,calculation_source_metric_ids,show_on_dashboard,dashboard_order')
+          .select('id,code,name,description,category,unit,data_type,input_type,aggregation,default_value,is_required,min_value,max_value,sort_order,is_active,metric_kind,calculation_operator,calculation_source_metric_ids,ratio_numerator_count,show_on_dashboard,dashboard_order')
           .is('deleted_at', null)
           .order('sort_order')
       ]);
@@ -208,6 +209,7 @@
         metricKind: item.metric_kind as MetricKind,
         calculationOperator: item.calculation_operator as 'sum' | 'ratio' | null,
         calculationSourceMetricIds: item.calculation_source_metric_ids ?? [],
+        numeratorCount: item.ratio_numerator_count ?? 1,
         dashboardVisible: item.show_on_dashboard,
         dashboardOrder: item.dashboard_order
       }));
@@ -316,8 +318,8 @@
     metricKind = 'input';
     metricSourceIds = [];
     metricOperator = 'sum';
-    numeratorId = '';
-    denominatorId = '';
+    numeratorIds = [];
+    denominatorIds = [];
     metricModalOpen = true;
   }
 
@@ -338,8 +340,8 @@
     metricKind = item.metricKind;
     metricSourceIds = [...item.calculationSourceMetricIds];
     metricOperator = item.calculationOperator ?? 'sum';
-    numeratorId = metricSourceIds[0] ?? '';
-    denominatorId = metricSourceIds[1] ?? '';
+    numeratorIds = metricSourceIds.slice(0, item.numeratorCount);
+    denominatorIds = metricSourceIds.slice(item.numeratorCount);
     metricModalOpen = true;
   }
 
@@ -374,6 +376,7 @@
           unit: values.unit,
           sortOrder: values.sortOrder,
           operator: metricOperator,
+          numeratorCount: metricOperator === 'ratio' ? numeratorIds.length : undefined,
           sourceMetricIds: selectedSourceIds
         };
         if (editingMetricId) {
@@ -425,7 +428,7 @@
       if (item.metricKind === 'calculated') {
         await updateCalculatedMetric(getSupabaseBrowserClient(), id, {
           name: item.name, description: item.description, category: item.category, unit: item.unit,
-          sortOrder: item.sortOrder, operator: item.calculationOperator ?? 'sum', sourceMetricIds: item.calculationSourceMetricIds, isActive: !item.active
+          sortOrder: item.sortOrder, operator: item.calculationOperator ?? 'sum', sourceMetricIds: item.calculationSourceMetricIds, numeratorCount: item.numeratorCount, isActive: !item.active
         });
       } else {
         await updateStatisticMetric(getSupabaseBrowserClient(), id, {
@@ -481,11 +484,10 @@
       : [...metricSourceIds, metricId];
   }
 
-  function metricFormula(item: MetricSetting): string {
-    return item.calculationSourceMetricIds
-      .map((id) => metrics.find((candidate) => candidate.id === id)?.name)
-      .filter((name): name is string => Boolean(name))
-      .join(item.calculationOperator === 'ratio' ? ' ÷ ' : ' + ');
+  function formatFormula(ids: string[], fields: MetricSetting[], operator: 'sum' | 'ratio' | null, split: number): string {
+    const names = ids.map(id => fields.find(field => field.id === id)?.name ?? '?');
+    if (operator !== 'ratio') return names.join(' + ');
+    return `(${names.slice(0, split).join(' + ') || 'A'}) ÷ (${names.slice(split).join(' + ') || 'B'})`;
   }
 
   async function saveGeneralSettings(): Promise<void> {
@@ -708,7 +710,7 @@
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2"><h3 class="text-sm font-semibold text-slate-950">{item.name}</h3>{#if item.metricKind === 'calculated'}<span class="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[0.68rem] font-semibold text-violet-700"><Calculator size={11} /> Calculated</span>{:else if item.required}<span class="rounded-full bg-amber-50 px-2 py-0.5 text-[0.68rem] font-semibold text-amber-700">บังคับกรอก</span>{/if}</div>
               <p class="mt-1 text-xs text-slate-500">{item.code} · {item.dataType} · หน่วย {item.unit} · ลำดับ {item.sortOrder}</p>
-              {#if item.metricKind === 'calculated'}<p class="mt-1 text-xs font-medium text-violet-700">สูตร: {metricFormula(item) || 'ยังไม่พบ Field ต้นทาง'}</p>{/if}
+              {#if item.metricKind === 'calculated'}<p class="mt-1 text-xs font-medium text-violet-700">สูตร: {formatFormula(item.calculationSourceMetricIds, metrics, item.calculationOperator, item.numeratorCount) || 'ยังไม่พบ Field ต้นทาง'}</p>{/if}
             </div>
             <p class="text-xs text-slate-500">{item.metricKind === 'calculated' ? 'แสดงใน Report' : item.minValue !== null ? `ขั้นต่ำ ${item.minValue}` : 'ไม่จำกัดค่า'}</p>
             <span class={`w-fit rounded-full border px-2.5 py-1 text-xs font-semibold ${item.active ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-100 text-slate-500'}`}>{item.active ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}</span>
@@ -763,8 +765,18 @@
             <label><span class="text-sm font-medium">วิธีคำนวณ</span><select class="app-input mt-2" bind:value={metricOperator}><option value="sum">ผลรวม (A + B)</option><option value="ratio">อัตราส่วน (A ÷ B)</option></select></label>
             {#if metricOperator === 'ratio'}
               <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                <label><span class="text-sm font-medium">ตัวตั้ง (A)</span><select class="app-input mt-2" bind:value={numeratorId}><option value="">เลือก Field</option>{#each calculationSourceOptions as source}<option value={source.id}>{source.name}</option>{/each}</select></label>
-                <label><span class="text-sm font-medium">ตัวหาร (B)</span><select class="app-input mt-2" bind:value={denominatorId}><option value="">เลือก Field</option>{#each calculationSourceOptions as source}<option value={source.id}>{source.name}</option>{/each}</select></label>
+                <fieldset class="grid content-start gap-2 rounded-xl border border-violet-100 bg-white p-3">
+                  <legend class="px-1 text-sm font-medium">ตัวตั้ง (A)</legend>
+                  {#each calculationSourceOptions as source (source.id)}
+                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="accent-violet-600" bind:group={numeratorIds} value={source.id} />{source.name}</label>
+                  {/each}
+                </fieldset>
+                <fieldset class="grid content-start gap-2 rounded-xl border border-violet-100 bg-white p-3">
+                  <legend class="px-1 text-sm font-medium">ตัวหาร (B)</legend>
+                  {#each calculationSourceOptions as source (source.id)}
+                    <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="accent-violet-600" bind:group={denominatorIds} value={source.id} />{source.name}</label>
+                  {/each}
+                </fieldset>
               </div>
               <p class="mt-2 text-xs leading-5 text-violet-800">ผลรวม A ÷ ผลรวม B จากข้อมูลที่อนุมัติแล้ว ปัดเป็นจำนวนเต็ม (เศษตั้งแต่ 0.5 ปัดขึ้น) หากข้อมูลไม่ครบหรือหารด้วยศูนย์ จะแสดง — พร้อมคำอธิบายเมื่อวางเมาส์</p>
             {:else}

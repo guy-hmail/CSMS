@@ -11,6 +11,7 @@ export type ReportMetric = {
   aggregation: 'sum' | 'avg' | 'max' | 'min';
   metricKind: 'input' | 'calculated';
   calculationOperator: 'sum' | 'ratio' | null;
+  numeratorCount?: number;
   sourceMetricCodes: string[];
 };
 

@@ -17,11 +17,16 @@ export function ratioResult(a: number | null | undefined, b: number | null | und
 
 export function visibleRatioTotal(
   rows: Array<{ values: Record<string, number | null>; errors?: Record<string, CalculationError> }>,
-  metric: { metricCode: string; sourceMetricCodes: string[] }
+  metric: { metricCode: string; sourceMetricCodes: string[]; numeratorCount?: number }
 ): CalculationResult {
-  const [a, b] = metric.sourceMetricCodes;
-  if (!rows.length || !a || !b || rows.some(row => row.errors?.[metric.metricCode] === 'MISSING_DATA' || row.values[a] == null || row.values[b] == null)) {
+  const sources = metric.sourceMetricCodes;
+  const split = metric.numeratorCount ?? 1;
+  if (!rows.length || split < 1 || split >= sources.length ||
+      rows.some(row => row.errors?.[metric.metricCode] === 'MISSING_DATA' || sources.some(code => row.values[code] == null))) {
     return { value: null, error: 'MISSING_DATA' };
   }
-  return ratioResult(rows.reduce((sum, row) => sum + row.values[a]!, 0), rows.reduce((sum, row) => sum + row.values[b]!, 0));
+  function total(codes: string[]): number {
+    return rows.reduce((sum, row) => sum + codes.reduce((subtotal, code) => subtotal + row.values[code]!, 0), 0);
+  }
+  return ratioResult(total(sources.slice(0, split)), total(sources.slice(split)));
 }
