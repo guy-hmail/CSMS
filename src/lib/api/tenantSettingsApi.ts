@@ -50,6 +50,7 @@ export type CalculatedMetricPayload = {
   category: string;
   unit: string;
   sortOrder: number;
+  numeratorCount?: number;
   sourceMetricIds: string[];
 };
 

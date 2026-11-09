@@ -14,4 +14,9 @@ assert.deepEqual(visibleRatioTotal([{ values: { A: 5, B: 0 } }, { values: { A: 1
 assert.equal(visibleRatioTotal([], metric).error, 'MISSING_DATA');
 assert.equal(visibleRatioTotal([{ values: { A: 1, B: 2 }, errors: { R: 'MISSING_DATA' } }], metric).error, 'MISSING_DATA');
 assert.equal(visibleRatioTotal([{ values: { A: 1, B: null } }], metric).error, 'MISSING_DATA');
+const grouped = { metricCode: 'R', numeratorCount: 4, sourceMetricCodes: ['A1','A2','A3','A4','B1','B2'] };
+const inputs = { A1: 60, A2: 20, A3: 10, A4: 5, B1: 7, B2: 3 };
+assert.deepEqual(visibleRatioTotal([{ values: inputs }], grouped), { value: 10, error: null });
+assert.equal(visibleRatioTotal([{ values: { ...inputs, A4: null } }], grouped).error, 'MISSING_DATA');
+assert.equal(visibleRatioTotal([{ values: { ...inputs, B1: 0, B2: 0 } }], grouped).error, 'DIVISION_BY_ZERO');
 console.log('Ratio calculation tests passed');
