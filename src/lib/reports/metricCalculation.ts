@@ -22,18 +22,14 @@ export function visibleRatioTotal(
 ): CalculationResult {
   const sources = metric.sourceMetricCodes;
   const split = metric.numeratorCount ?? 1;
-  if (!rows.length || split < 1 || split >= sources.length ||
-      rows.some(row => row.errors?.[metric.metricCode] === 'MISSING_DATA')) {
+  if (!rows.length || split < 1 || split >= sources.length) {
     return { value: null, error: 'MISSING_DATA' };
   }
   function total(codes: string[]): number | null {
-    let sum = 0;
-    for (const row of rows) {
-      const values = codes.map(code => row.values[code]).filter((value): value is number => value != null);
-      if (!values.length) return null;
-      sum += values.reduce((subtotal, value) => subtotal + value, 0);
-    }
-    return sum;
+    const values = rows.flatMap(row => codes.map(code => row.values[code]))
+      .filter((value): value is number => value != null);
+    return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
   }
+
   return ratioResult(total(sources.slice(0, split)), total(sources.slice(split)));
 }

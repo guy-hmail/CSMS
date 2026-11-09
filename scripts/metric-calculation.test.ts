@@ -12,7 +12,7 @@ const metric = { metricCode: 'R', sourceMetricCodes: ['A', 'B'] };
 assert.deepEqual(visibleRatioTotal([{ values: { A: 5, B: 2 } }, { values: { A: 1, B: 4 } }], metric), { value: 100, error: null });
 assert.deepEqual(visibleRatioTotal([{ values: { A: 5, B: 0 } }, { values: { A: 1, B: 2 } }], metric), { value: 300, error: null });
 assert.equal(visibleRatioTotal([], metric).error, 'MISSING_DATA');
-assert.equal(visibleRatioTotal([{ values: { A: 1, B: 2 }, errors: { R: 'MISSING_DATA' } }], metric).error, 'MISSING_DATA');
+assert.deepEqual(visibleRatioTotal([{ values: { A: 1, B: 2 }, errors: { R: 'MISSING_DATA' } }], metric), { value: 50, error: null });
 assert.equal(visibleRatioTotal([{ values: { A: 1, B: null } }], metric).error, 'MISSING_DATA');
 const grouped = { metricCode: 'R', numeratorCount: 4, sourceMetricCodes: ['A1','A2','A3','A4','B1','B2'] };
 const inputs = { A1: 60, A2: 20, A3: 10, A4: 5, B1: 7, B2: 3 };
@@ -25,3 +25,11 @@ console.log('Ratio calculation tests passed');
 
 assert.equal(ratioResult(1, 32).value, 3.13);
 assert.equal(ratioResult(1, 3).value, 33.33);
+
+const splitRows = [
+  { values: { A: 8, B: null }, errors: { R: 'MISSING_DATA' as const } },
+  { values: { A: null, B: 2 }, errors: { R: 'MISSING_DATA' as const } }
+];
+assert.deepEqual(visibleRatioTotal(splitRows, metric), { value: 400, error: null });
+assert.equal(visibleRatioTotal([{ values: { A: null, B: 2 } }, { values: { A: null, B: 4 } }], metric).error, 'MISSING_DATA');
+assert.deepEqual(visibleRatioTotal([{ values: { A: 0, B: null } }, { values: { A: null, B: 2 } }], metric), { value: 0, error: null });
